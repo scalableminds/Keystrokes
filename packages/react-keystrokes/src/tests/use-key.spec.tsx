@@ -13,6 +13,11 @@ const TestComponent = () => {
   return <div>{isPressed ? 'isPressed' : 'isNotPressed'}</div>
 }
 
+const TestComponentWithPreventDefault = () => {
+  const isPressed = useKey('a', true)
+  return <div>{isPressed ? 'isPressed' : 'isNotPressed'}</div>
+}
+
 describe('useKey(key) -> isPressed', () => {
   it('initial state is unpressed', async () => {
     const keystrokes = createTestKeystrokes()
@@ -59,6 +64,32 @@ describe('useKey(key) -> isPressed', () => {
     keystrokes.release({ key: 'a' })
     await wait()
 
+    expect(root.findByType('div').children[0]).toEqual('isNotPressed')
+  })
+
+  it('prevents default when configured to', async () => {
+    const keystrokes = createTestKeystrokes()
+
+    const { root } = await act(() =>
+      create(
+        <KeystrokesProvider keystrokes={keystrokes}>
+          <TestComponentWithPreventDefault />
+        </KeystrokesProvider>,
+      ),
+    )
+
+    let defaultPrevented = false
+    const keyEvent = {
+      key: 'a',
+      preventDefault() {
+        defaultPrevented = true
+      },
+    }
+    keystrokes.press(keyEvent)
+    keystrokes.release(keyEvent)
+    await wait()
+
+    expect(defaultPrevented).toEqual(true)
     expect(root.findByType('div').children[0]).toEqual('isNotPressed')
   })
 })

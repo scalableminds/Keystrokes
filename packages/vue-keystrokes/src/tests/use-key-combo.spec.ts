@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createTestKeystrokes, Keystrokes } from '@rwh/keystrokes'
 import { useKeyCombo, useKeystrokes } from '..'
 import { wait } from './helpers/next-tick'
-import { computed, defineComponent, effect } from 'vue'
+import { computed, defineComponent } from 'vue'
 
 const ProviderComponent = defineComponent({
   props: ['keystrokes'],
@@ -12,8 +12,8 @@ const ProviderComponent = defineComponent({
     useKeystrokes(keystrokes)
   },
   template: `
-    <slot />
-  `,
+      <slot/>
+    `,
 })
 
 const TestComponent = defineComponent({
@@ -27,8 +27,23 @@ const TestComponent = defineComponent({
     return { text }
   },
   template: `
-    <div>{{text}}</div>
-`,
+      <div>{{ text }}</div>
+    `,
+})
+
+const TestComponentWithPreventDefault = defineComponent({
+  setup() {
+    const isPressed = useKeyCombo('a+b', true)
+
+    const text = computed(() =>
+      isPressed.value ? 'isPressed' : 'isNotPressed',
+    )
+
+    return { text }
+  },
+  template: `
+      <div>{{ text }}</div>
+    `,
 })
 
 describe('useKeyCombo(keyCombo) -> isPressed', () => {
@@ -68,6 +83,30 @@ describe('useKeyCombo(keyCombo) -> isPressed', () => {
     keystrokes.release({ key: 'b' })
     await wait()
 
+    expect(w.get('div').text()).toEqual('isNotPressed')
+  })
+
+  it('prevents default when configured to', async () => {
+    const keystrokes = createTestKeystrokes()
+    const w = mount(ProviderComponent, {
+      slots: { default: TestComponentWithPreventDefault },
+      props: { keystrokes },
+    })
+
+    let defaultPrevented = false
+    const lastKeyEvent = {
+      key: 'b',
+      preventDefault() {
+        defaultPrevented = true
+      },
+    }
+    keystrokes.press({ key: 'a' })
+    keystrokes.press(lastKeyEvent)
+    keystrokes.release({ key: 'a' })
+    keystrokes.release(lastKeyEvent)
+    await wait()
+
+    expect(defaultPrevented).toEqual(true)
     expect(w.get('div').text()).toEqual('isNotPressed')
   })
 })
