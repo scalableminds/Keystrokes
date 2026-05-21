@@ -1,0 +1,59 @@
+{
+  "name": "@rwh/keystrokes",
+  "version": "1.5.6",
+  "description": "Keystrokes is an easy to use library for binding functions to keys and key combos. It can be used with any TypeScript or JavaScript project, even in non-browser environments.",
+  "type": "module",
+  "main": "dist/keystrokes.umd.cjs",
+  "module": "dist/keystrokes.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/keystrokes.js",
+      "require": "./dist/keystrokes.umd.cjs"
+    }
+  },
+  "files": [
+    "dist/*.js",
+    "dist/*.cjs",
+    "dist/*.map",
+    "dist/*.d.ts",
+    "logo.png",
+    "readme.md"
+  ],
+  "scripts": {
+    "lint": "eslint ./src",
+    "test": "vitest run",
+    "build": "rm -rf dist/ && cp ../../readme.md readme.md && vite build",
+    "dev": "vite build -w",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "keyboard",
+    "key binding",
+    "key combo",
+    "keys",
+    "key events"
+  ],
+  "author": "Robert Hurst <robertwhurst@gmail.com>",
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/RobertWHurst",
+  "repository": "github:RobertWHurst/Keystrokes",
+  "bugs": {
+    "email": "robertwhurst@gmail.com",
+    "url": "https://github.com/RobertWHurst/Keystrokes/issues/new?template=bug_report.md"
+  },
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.2",
+    "@types/node": "^20.4.6",
+    "@typescript-eslint/eslint-plugin": "^6.2.1",
+    "@typescript-eslint/parser": "^6.2.1",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.1",
+    "typescript": "^5.1.6",
+    "vite": "^4.5.5",
+    "vitest": "^0.34.1"
+  }
+}
