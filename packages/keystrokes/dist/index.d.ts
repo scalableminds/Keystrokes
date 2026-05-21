@@ -1,0 +1,28 @@
+export { BrowserKeyEventProps, BrowserKeyEvent, BrowserKeyComboEvent, BrowserKeyComboEventProps, MaybeBrowserKeyComboEventProps, browserOnActiveBinder, browserOnInactiveBinder, browserOnKeyPressedBinder, browserOnKeyReleasedBinder, } from './browser-bindings';
+export { KeyEvent, HandlerFn, HandlerObj, Handler, HandlerState, } from './handler-state';
+export { KeyComboEvent, KeyComboState } from './key-combo-state';
+export { defaultSequenceTimeout, OnActiveEventBinder, OnKeyEventBinder, KeyComboEventMapper, KeyPress, KeystrokesOptions, BindEnvironmentOptions, Keystrokes, } from './keystrokes';
+import { MaybeBrowserKeyComboEventProps, MaybeBrowserKeyEventProps } from './browser-bindings';
+import { KeyEvent } from './handler-state';
+import { KeyComboState } from './key-combo-state';
+import { Keystrokes, KeystrokesOptions } from './keystrokes';
+declare let globalKeystrokes: Keystrokes;
+export declare const setGlobalKeystrokes: (keystrokes?: Keystrokes) => void;
+export declare const getGlobalKeystrokes: () => Keystrokes<KeyboardEvent, import("./browser-bindings").BrowserKeyEventProps, import("./browser-bindings").BrowserKeyComboEventProps>;
+export declare const setGlobalKeystrokesOptions: (options: KeystrokesOptions) => void;
+export declare const bindKey: typeof globalKeystrokes.bindKey;
+export declare const unbindKey: typeof globalKeystrokes.unbindKey;
+export declare const bindKeyCombo: typeof globalKeystrokes.bindKeyCombo;
+export declare const unbindKeyCombo: typeof globalKeystrokes.unbindKeyCombo;
+export declare const checkKey: typeof globalKeystrokes.checkKey;
+export declare const checkKeyCombo: typeof globalKeystrokes.checkKeyCombo;
+export declare const normalizeKeyCombo: typeof KeyComboState.normalizeKeyCombo;
+export declare const stringifyKeyCombo: typeof KeyComboState.stringifyKeyCombo;
+export declare const parseKeyCombo: typeof KeyComboState.parseKeyCombo;
+export type TestKeystrokes<OriginalEvent, KeyEventProps, KeyComboEventProps> = Keystrokes<OriginalEvent, KeyEventProps, KeyComboEventProps> & {
+    activate(): void;
+    deactivate(): void;
+    press(key: Partial<KeyEvent<OriginalEvent, KeyEventProps>>): void;
+    release(key: Partial<KeyEvent<OriginalEvent, KeyEventProps>>): void;
+};
+export declare const createTestKeystrokes: <OriginalEvent = KeyboardEvent, KeyEventProps = MaybeBrowserKeyEventProps<OriginalEvent>, KeyComboEventProps = MaybeBrowserKeyComboEventProps<OriginalEvent>>(options?: KeystrokesOptions<OriginalEvent, KeyEventProps, KeyComboEventProps>) => TestKeystrokes<OriginalEvent, KeyEventProps, KeyComboEventProps>;

@@ -1,6 +1,9 @@
 {
   "name": "@rwh/keystrokes-monorepo",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "pnpm -r --sort build",
     "test": "pnpm -r test",
