@@ -15,9 +15,6 @@
   <a href="https://github.com/sponsors/RobertWHurst">
     <img src="https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86">
   </a>
-  <a href="https://openbase.com/js/@rwh/keystrokes?utm_source=embedded&amp;utm_medium=badge&amp;utm_campaign=rate-badge">
-    <img src="https://badges.openbase.com/js/featured/@rwh/keystrokes.svg?token=2wanGBvFibIfrdpnvnSioqIgoC7lJt3ztNNcKsRw+Pg=">
-  </a>
 </p>
 
 > [!IMPORTANT]
@@ -27,6 +24,10 @@
 > before changing anything in `src/`, and read
 > [Releasing this fork](#releasing-this-fork) before expecting a change to reach
 > a downstream project.
+>
+> Note that `packages/keystrokes/readme.md` is a **build artifact** — the package
+> build copies this file over it — so fork documentation belongs here, in the
+> monorepo root readme, and nowhere else.
 
 __If you encounter a bug please [report it][bug-report].__
 
@@ -41,8 +42,8 @@ import { bindKey, bindKeyCombo } from '@rwh/keystrokes'
 bindKey('a', () =>
   console.log('You\'re pressing "a"'))
 
-bindKeyCombo('ctrl > y, r', () =>
-  console.log('You pressed "ctrl" then "y", released both, and are pressing "r"'))
+bindKeyCombo('control > y, r', () =>
+  console.log('You pressed "control" then "y", released both, and are pressing "r"'))
 ```
 
 ## Installation
@@ -150,8 +151,8 @@ import { bindKey, bindKeyCombo } from '@rwh/keystrokes'
 bindKey('a', () =>
   console.log('You\'re pressing "a"'))
 
-bindKeyCombo('ctrl > y, r', () =>
-  console.log('You pressed "ctrl" then "y", released both, and are pressing "r"'))
+bindKeyCombo('control > y, r', () =>
+  console.log('You pressed "control" then "y", released both, and are pressing "r"'))
 
 bindKey('a', {
   onPressed: () => console.log('You pressed "a"'),
@@ -159,9 +160,9 @@ bindKey('a', {
   onReleased: () => console.log('You released "a"'),
 })
 
-bindKeyCombo('ctrl > y, r', {
-  onPressed: () => console.log('You pressed "ctrl" then "y", released both, then pressed "r"'),
-  onPressedWithRepeat: () => console.log('You pressed "ctrl" then "y", released both, and are pressing "r"'),
+bindKeyCombo('control > y, r', {
+  onPressed: () => console.log('You pressed "control" then "y", released both, then pressed "r"'),
+  onPressedWithRepeat: () => console.log('You pressed "control" then "y", released both, and are pressing "r"'),
   onReleased: () => console.log('You released "r"'),
 })
 ```
@@ -170,11 +171,11 @@ Note that when you pass a function handler instead of an object handler, it is
 short hand for passing an object handler with a `onPressedWithRepeat` method.
 
 ```js
-const handler = () => console.log('You pressed "ctrl" then "y", released both, and are pressing "r"')
+const handler = () => console.log('You pressed "control" then "y", released both, and are pressing "r"')
 
-bindKeyCombo('ctrl > y, r', handler)
+bindKeyCombo('control > y, r', handler)
 // ...is shorthand for...
-bindKeyCombo('ctrl > y, r', { onPressedWithRepeat: handler })
+bindKeyCombo('control > y, r', { onPressedWithRepeat: handler })
 ```
 
 ## Unbinding Keys and Key Combos
@@ -189,20 +190,20 @@ import { bindKeyCombo, unbindKeyCombo } from '@rwh/keystrokes'
 const handler = () => ...
 
 // bind the combo to the handler
-bindKeyCombo('ctrl > y, r', handler)
+bindKeyCombo('control > y, r', handler)
 
 // ...and some time later...
 
 // unbind the handler
-unbindKeyCombo('ctrl > y, r', handler)
+unbindKeyCombo('control > y, r', handler)
 ```
 
 You can also wipe out all bound handlers on a combo by excluding a handler
 reference.
 
 ```js
-// unbind all handlers for the combo 'ctrl > y, r'
-unbindKeyCombo('ctrl > y, r')
+// unbind all handlers for the combo 'control > y, r'
+unbindKeyCombo('control > y, r')
 ```
 
 ## Checking Keys and Key Combos
@@ -216,9 +217,9 @@ import { checkKey, checkKeyCombo } from '@rwh/keystrokes'
 // keyIsPressed will be true if a is pressed, and false otherwise
 const keyIsPressed = checkKey('a')
 
-// keyComboIsPressed will be true if ctrl then y was pressed and r is pressed.
+// keyComboIsPressed will be true if control then y was pressed and r is pressed.
 // It will be false otherwise.
-const keyComboIsPressed = checkKeyCombo('ctrl > y, r')
+const keyComboIsPressed = checkKeyCombo('control > y, r')
 ```
 
 ## Using Keystrokes with React
@@ -404,7 +405,7 @@ keystrokes.checkKeyCombo(...)
 
 ```
 
-If you want to go this route you won't have to work about overhead from the
+If you want to go this route you won't have to worry about overhead from the
 global instance as it is only created if you use the exported functions
 associated with it.
 
@@ -645,7 +646,7 @@ downstream project back at `#dist/keystrokes` before merging it.
 
 ## Help Welcome
 
-If you want to support this project by throwing be some coffee money It's
+If you want to support this project by throwing me some coffee money It's
 greatly appreciated.
 
 [![sponsor](https://img.shields.io/static/v1?label=Sponsor&message=%E2%9D%A4&logo=GitHub&color=%23fe8e86)](https://github.com/sponsors/RobertWHurst)
