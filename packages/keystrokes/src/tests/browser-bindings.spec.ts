@@ -98,6 +98,94 @@ describe('browserOnInactiveBinder(handler) -> void', () => {
   })
 })
 
+describe('/stale key state/', () => {
+  const getHandlers = () => {
+    const winAddEventListenerStub = vi.fn()
+    const docAddEventListenerStub = vi.fn()
+    const dispatchEventStub = vi.fn()
+    vi.stubGlobal('addEventListener', winAddEventListenerStub)
+    vi.spyOn(document, 'addEventListener').mockImplementation(
+      docAddEventListenerStub,
+    )
+    vi.spyOn(document, 'dispatchEvent').mockImplementation(dispatchEventStub)
+
+    browserOnInactiveBinder(vi.fn())
+    browserOnKeyPressedBinder(vi.fn())
+    browserOnKeyReleasedBinder(vi.fn())
+
+    return {
+      dispatchEventStub,
+      inactive: winAddEventListenerStub.mock.calls[0][1],
+      keyPressed: docAddEventListenerStub.mock.calls[0][1],
+      keyReleased: docAddEventListenerStub.mock.calls[1][1],
+      listenedWindowEvents: winAddEventListenerStub.mock.calls.map((c) => c[0]),
+    }
+  }
+
+  it('tracks pressed keys by code, so a changed key label cannot strand one', () => {
+    const { inactive, keyPressed, keyReleased, dispatchEventStub } =
+      getHandlers()
+
+    // keydown reports "?" but the keyup reports "/" — same physical key.
+    keyPressed(new KeyboardEvent('keydown', { key: '?', code: 'Slash' }))
+    keyReleased(new KeyboardEvent('keyup', { key: '/', code: 'Slash' }))
+    inactive()
+
+    // Nothing is held, so losing focus must not replay a synthetic keyup.
+    expect(dispatchEventStub).toBeCalledTimes(0)
+
+    vi.unstubAllGlobals()
+  })
+
+  it('replays the key reported at keydown when releasing on focus loss', () => {
+    const { inactive, keyPressed, dispatchEventStub } = getHandlers()
+
+    keyPressed(new KeyboardEvent('keydown', { key: '?', code: 'Slash' }))
+    inactive()
+
+    expect(dispatchEventStub).toBeCalledTimes(1)
+    const synthetic = dispatchEventStub.mock.calls[0][0]
+    expect(synthetic.type).toBe('keyup')
+    expect(synthetic.key).toBe('?')
+    expect(synthetic.code).toBe('Slash')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('also releases held keys when the page is hidden or unloaded', () => {
+    const { listenedWindowEvents } = getHandlers()
+
+    expect(listenedWindowEvents).toContain('blur')
+    expect(listenedWindowEvents).toContain('pagehide')
+    // visibilitychange is fired at the document but bubbles, so a window
+    // listener sees it without disturbing the document listener order.
+    expect(listenedWindowEvents).toContain('visibilitychange')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('ignores keydowns that cannot have a matching keyup', () => {
+    const handlerStub = vi.fn()
+    const docAddEventListenerStub = vi.fn()
+    vi.spyOn(document, 'addEventListener').mockImplementation(
+      docAddEventListenerStub,
+    )
+
+    browserOnKeyPressedBinder(handlerStub)
+    const keyPressed = docAddEventListenerStub.mock.calls[0][1]
+
+    // IME composition and autofill emit keydowns with no reliable keyup, so
+    // tracking them can only ever strand a key.
+    keyPressed({ key: 'a', code: 'KeyA', isComposing: true })
+    keyPressed({ key: 'Process', code: 'KeyA' })
+    keyPressed({ key: 'Unidentified', code: 'KeyA' })
+
+    expect(handlerStub).toBeCalledTimes(0)
+
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('browserOnKeyPressedBinder(handler) -> void', () => {
   it('correctly binds the given handler to document keydown', () => {
     const addEventListenerStub = vi.fn()
