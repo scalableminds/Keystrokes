@@ -20,6 +20,14 @@
   </a>
 </p>
 
+> [!IMPORTANT]
+> This is the **scalableminds fork** of Keystrokes, consumed by WEBKNOSSOS. It
+> diverges from upstream in several ways — see
+> [scalableminds fork: differences from upstream](#scalableminds-fork-differences-from-upstream)
+> before changing anything in `src/`, and read
+> [Releasing this fork](#releasing-this-fork) before expecting a change to reach
+> a downstream project.
+
 __If you encounter a bug please [report it][bug-report].__
 
 Keystrokes as a quick and easy to use library for binding functions to keys
@@ -497,6 +505,143 @@ const keystrokes = new Keystrokes({
 
 keystrokes.bindKey(...)
 ```
+
+## scalableminds fork: differences from upstream
+
+Everything below is specific to this fork and is **not** in
+`RobertWHurst/Keystrokes`. Keep this list current when changing `src/`, so the
+next person does not have to reconstruct it from `git log`.
+
+### 1. `@<code>` key aliases
+
+Every key event carries `aliases: ['@' + event.code]`, so a binding can name a
+physical key rather than the character it produces. This is what makes a shortcut
+on a punctuation key survive a keyboard-layout change. Related upstream requests:
+[#33](https://github.com/RobertWHurst/Keystrokes/issues/33),
+[#58](https://github.com/RobertWHurst/Keystrokes/issues/58). *Upstreamable.*
+
+### 2. Longest combo wins
+
+When a keypress completes several combos at once, `_handleKeyPress` executes only
+those whose `sequenceLength` is the largest among them, and `_handleKeyRelease`
+releases them via `_keyCombosPressedByKey`.
+
+The motivation is that shortcuts are frequently sub-combos of one another: in
+WEBKNOSSOS `b` sets a branch point while `control + k, b` switches to the brush
+tool. Without this, completing the longer combo also fires the shorter one. Only
+the most specific match should win. *Offered upstream as a PR.*
+
+Invariant to preserve: **a longer combo suppresses shorter ones for exactly as
+long as it is physically held, and not one event longer.** Because suppression is
+global, a combo that stays marked as pressed disables every shorter combo for the
+rest of the session — which is what made this a source of hard-to-diagnose bugs.
+The recovery path for that is `releaseAllKeys()`, via `forceRelease` in
+`key-combo-state.ts`.
+
+### 3. Keys are tracked by physical key, not by label
+
+`KeyEvent.identity` (set to `event.code` by the browser bindings) is the id used
+for `_activeKeyPresses`, `_activeKeyMap` and `_keyCombosPressedByKey`.
+
+`event.key` cannot serve that purpose because the label depends on the modifiers
+held at the time: pressing shift+slash reports `?` on keydown and, if shift is
+released first, `/` on keyup. Tracking by label therefore strands the `?` entry
+forever — and since combo matching is positional, one stranded key stops *every*
+single-key combo from matching until the page reloads.
+
+Also covers [#64](https://github.com/RobertWHurst/Keystrokes/issues/64)
+(`Cannot read properties of undefined (reading 'toLowerCase')`): a keydown with
+no `key` is ignored, while a keyup with no `key` is still resolved through
+`identity` and released under the label seen at keydown. Note the patch suggested
+in that issue — returning early from both handlers — is unsafe: skipping a keyup
+is exactly what strands a key. *Upstreamable.*
+
+### 4. Partially typed combos expire
+
+`sequenceTimeout` governs the whole sequence, not just the release window. Once
+`control + k` has been typed and released, upstream leaves the combo armed
+indefinitely, so whichever single key is pressed next — however much later —
+completes it instead of firing its own handler. See `_sequenceAdvancedAt` in
+`key-combo-state.ts`. *Upstreamable.*
+
+### 5. `releaseAllKeys()`
+
+Public on both the instance and the module, and used internally whenever the
+environment goes inactive. Consumers need a supported way to resynchronise after
+keyups that never arrived — a page regaining focus, or a modal that stopped
+propagation of key events. Related: [#49](https://github.com/RobertWHurst/Keystrokes/issues/49).
+*Upstreamable.*
+
+### 6. Broader recovery in the browser bindings
+
+- `activeKeyEvents` is keyed by `event.code` rather than `event.key`, so it does
+  not leak an entry every time a key's label changes mid-press.
+- Held keys are released on `pagehide` and on `visibilitychange` (hidden) as well
+  as `blur`, since `blur` does not cover every way a page stops receiving keys.
+- Keydowns that cannot have a matching keyup are ignored: `isComposing`, and the
+  `Process` / `Unidentified` placeholders emitted by IMEs and some autofill
+  implementations. Keyups are **never** filtered — they only remove state, and
+  dropping one is what strands a key. Likely also covers
+  [#50](https://github.com/RobertWHurst/Keystrokes/issues/50) and
+  [#55](https://github.com/RobertWHurst/Keystrokes/issues/55). *Upstreamable.*
+
+### Known behaviour, deliberately unchanged
+
+Combo matching is positional: each unit is only searched in a window starting at
+the current offset into the held-key list. As a result, **while any unrelated key
+is held, no single-key combo matches at all** — holding space and tapping `b`
+does nothing. This is intended for WEBKNOSSOS. If it ever needs revisiting, see
+`NOTE[held-key-blocks-single-key-combos]` in `key-combo-state.ts`.
+
+## Releasing this fork
+
+Downstream projects install the built artifacts from the orphan `dist/keystrokes`
+branch, not from npm:
+
+```json
+"@rwh/keystrokes": "github:scalableminds/Keystrokes#dist/keystrokes"
+```
+
+A separate branch is needed because Yarn and npm resolve a git dependency by
+looking for `package.json` at the repository root, and this repo is a pnpm
+monorepo whose root package is `@rwh/keystrokes-monorepo`.
+
+### Releasing a merged change
+
+1. Make your `src/` changes on a feature branch and open a PR against `main`.
+   CI runs lint and tests on pull requests.
+2. Once it is merged, run `scripts/update-dist.sh` from `main` (requires `pnpm`).
+   It builds the package and force-pushes `package.json` + `dist/` to
+   `dist/keystrokes`.
+3. In the downstream project, run `yarn install` and commit the lockfile change.
+
+Step 3 is not optional: the lockfile pins a commit hash on a force-pushed branch,
+so without refreshing it the consumer keeps the old build and the change silently
+does not ship.
+
+### Getting a change reviewed downstream before it is merged
+
+`dist/keystrokes` is what *every* consumer resolves, so publishing unreviewed work
+there ships it to anyone who runs `yarn install`. `update-dist.sh` refuses to
+publish it from a branch other than `main` for that reason (override with
+`ALLOW_UNMERGED=1` if you really mean to).
+
+Publish the review build to its own dist branch instead, and pin the commit the
+script prints:
+
+```sh
+./scripts/update-dist.sh dist/my-feature
+```
+
+```json
+"@rwh/keystrokes": "github:scalableminds/Keystrokes#<printed-sha>"
+```
+
+Pin the commit rather than the branch name — dist branches are force-pushed, so a
+branch reference can change under a reviewer mid-review.
+
+When the source PR merges, publish to `dist/keystrokes` as usual and point the
+downstream project back at `#dist/keystrokes` before merging it.
 
 ## Help Welcome
 

@@ -130,7 +130,7 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
   }
 
   get sequenceLength() {
-    return this._parsedKeyCombo.length;
+    return this._parsedKeyCombo.length
   }
 
   private _normalizedKeyCombo: string
@@ -145,6 +145,7 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
   >
   private _movingToNextSequenceAt: number
   private _sequenceIndex: number
+  private _sequenceAdvancedAt: number
   private _unitIndex: number
   private _lastActiveKeyPresses: KeyPress<OriginalEvent, KeyEventProps>[][]
   private _lastActiveKeyCount: number
@@ -167,10 +168,48 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     this._keyComboEventMapper = keyComboEventMapper
     this._movingToNextSequenceAt = 0
     this._sequenceIndex = 0
+    this._sequenceAdvancedAt = 0
     this._unitIndex = 0
     this._lastActiveKeyPresses = []
     this._lastActiveKeyCount = 0
     this._isPressedWithFinalUnit = null
+  }
+
+  /**
+   * Releases the combo if it is pressed and abandons any progress through its
+   * sequence.
+   *
+   * Both halves matter. A combo waiting part way through its sequence — "control
+   * + k" typed but not yet completed — is armed without being pressed, so nothing
+   * in the normal release path touches it, and it would otherwise swallow whatever
+   * key is pressed next, however much later.
+   */
+  forceRelease(event?: KeyEvent<OriginalEvent, KeyEventProps>) {
+    if (this._isPressedWithFinalUnit) {
+      // By this point updateState has already run and cleared _lastActiveKeyPresses,
+      // so the release event is built from the event that triggered the recovery.
+      if (event) {
+        this._handlerState.executeReleased(
+          this._wrapEvent(this._lastActiveKeyPresses, {
+            key: event.key,
+            aliases: new Set(event.aliases),
+            identity: event.identity,
+            event,
+          }),
+        )
+      }
+      this._isPressedWithFinalUnit = null
+    }
+
+    this._resetProgress()
+  }
+
+  private _resetProgress() {
+    this._movingToNextSequenceAt = 0
+    this._sequenceIndex = 0
+    this._sequenceAdvancedAt = 0
+    this._unitIndex = 0
+    this._lastActiveKeyPresses.length = 0
   }
 
   isOwnHandler(
@@ -220,15 +259,8 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     const hasReleasedKeys = activeKeysCount < this._lastActiveKeyCount
     this._lastActiveKeyCount = activeKeysCount
 
-    const sequence = this._parsedKeyCombo[this._sequenceIndex]
-    const previousUnits = sequence.slice(0, this._unitIndex)
-    const remainingUnits = sequence.slice(this._unitIndex)
-
     const reset = () => {
-      this._movingToNextSequenceAt = 0
-      this._sequenceIndex = 0
-      this._unitIndex = 0
-      this._lastActiveKeyPresses.length = 0
+      this._resetProgress()
 
       // In the case of key combos that are used by checkKeyCombo, we need to
       // clear the final unit for it because the executeReleased will not be
@@ -237,6 +269,21 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
         this._isPressedWithFinalUnit = null
       }
     }
+
+    // A partially typed combo must not stay armed indefinitely. Without this, once
+    // the user has typed "control + k" the combo waits forever, and whichever
+    // single key they press next — minutes later — completes it instead of firing
+    // its own handler.
+    if (
+      this._sequenceAdvancedAt !== 0 &&
+      this._sequenceAdvancedAt + sequenceTimeout < Date.now()
+    ) {
+      reset()
+    }
+
+    const sequence = this._parsedKeyCombo[this._sequenceIndex]
+    const previousUnits = sequence.slice(0, this._unitIndex)
+    const remainingUnits = sequence.slice(this._unitIndex)
 
     let activeKeyIndex = 0
 
@@ -250,9 +297,17 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
       if (activeKeysCount !== 0) return
       this._movingToNextSequenceAt = 0
       this._sequenceIndex += 1
+      this._sequenceAdvancedAt = Date.now()
       this._unitIndex = 0
       return
     }
+
+    // NOTE[held-key-blocks-single-key-combos]: matching below is positional — each
+    // unit is only searched in the window starting at activeKeyIndex. Consequence:
+    // while any unrelated key is held, no single key combo matches at all. This is
+    // intended for now (`b` must not fire while space is held). If it is ever
+    // deemed unwanted, this is the place to change: scan the whole activeKeyPresses
+    // list and track which entries have already been consumed.
 
     // go through each each previous unit. If any are no longer pressed then
     // we reset to the beginning of the combo.
@@ -331,6 +386,9 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     // Setting the final unit marks the combo as active. It also allows for
     // something to match key repeat against.
     this._isPressedWithFinalUnit = new Set(sequence[sequence.length - 1])
+
+    // The combo is complete, so it is no longer partially typed.
+    this._sequenceAdvancedAt = 0
   }
 
   _wrapEvent(

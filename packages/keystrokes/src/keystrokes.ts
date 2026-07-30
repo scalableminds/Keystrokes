@@ -28,6 +28,8 @@ export type KeyComboEventMapper<
 export type KeyPress<OriginalEvent, KeyEventProps> = {
   key: string
   aliases: Set<string>
+  // Stable id of the physical key; see KeyEvent#identity.
+  identity?: string
   event: KeyEvent<OriginalEvent, KeyEventProps>
 }
 
@@ -288,6 +290,9 @@ export class Keystrokes<
     })
     const unbindInactive = this._onInactiveBinder(() => {
       this._isActive = false
+      // Any keyup that happens while we are not receiving events is lost, so
+      // treat losing focus as releasing everything.
+      this.releaseAllKeys()
     })
     const unbindKeyPressed = this._onKeyPressedBinder((e) => {
       this._handleKeyPress(e)
@@ -308,6 +313,33 @@ export class Keystrokes<
     this._unbinder?.()
   }
 
+  /**
+   * Releases every key currently believed to be held and abandons any progress
+   * through a key combo. Call this whenever keyups may have been missed — the
+   * page regaining focus, or a modal that stopped propagation of key events.
+   *
+   * Without a way to do this a single missed keyup is unrecoverable: a stranded
+   * key stops all single key combos from matching, and a combo left marked as
+   * pressed keeps suppressing shorter combos (see the readme).
+   */
+  releaseAllKeys() {
+    const heldKeyPresses = [...this._activeKeyPresses]
+    for (const keyPress of heldKeyPresses)
+      this._handleKeyRelease(keyPress.event)
+
+    // Whatever is still marked pressed had its keyup swallowed, so it will never
+    // be released through the normal path.
+    const fallbackEvent = heldKeyPresses[heldKeyPresses.length - 1]?.event
+    for (const keyComboState of this._keyComboStatesArray) {
+      keyComboState.forceRelease(fallbackEvent)
+    }
+
+    this._activeKeyPresses.length = 0
+    this._activeKeyMap.clear()
+    this._keyCombosPressedByKey.clear()
+    this._updateKeyComboStates()
+  }
+
   private _ensureCachedKeyComboState(keyCombo: string) {
     keyCombo = KeyComboState.normalizeKeyCombo(keyCombo)
     if (!this._watchedKeyComboStates[keyCombo]) {
@@ -321,21 +353,36 @@ export class Keystrokes<
     return keyComboState
   }
 
-  private _handleKeyPress(event: KeyEvent<OriginalEvent, KeyEventProps>) {
-    if (!this._isActive) return
-
-    event = {
+  private _normalizeEvent(event: KeyEvent<OriginalEvent, KeyEventProps>) {
+    const normalized = {
       ...event,
       key: event.key.toLowerCase(),
       aliases: event.aliases?.map((a) => a.toLowerCase()) ?? [],
     }
 
-    const remappedKey = this._keyRemap[event.key]
-    if (remappedKey) event.key = remappedKey
-    for (let i = 0; i < event.aliases!.length; i += 1) {
-      const remappedAlias = this._keyRemap[event.aliases![i]]
-      if (remappedAlias) event.aliases![i] = remappedAlias
+    const remappedKey = this._keyRemap[normalized.key]
+    if (remappedKey) normalized.key = remappedKey
+    for (let i = 0; i < normalized.aliases.length; i += 1) {
+      const remappedAlias = this._keyRemap[normalized.aliases[i]]
+      if (remappedAlias) normalized.aliases[i] = remappedAlias
     }
+
+    return normalized
+  }
+
+  private _identityOf(event: KeyEvent<OriginalEvent, KeyEventProps>) {
+    return event.identity ?? event.key
+  }
+
+  private _handleKeyPress(event: KeyEvent<OriginalEvent, KeyEventProps>) {
+    if (!this._isActive) return
+
+    // Some events arrive without a key at all. There is nothing to track, and
+    // normalizing would throw.
+    // https://github.com/RobertWHurst/Keystrokes/issues/64
+    if (event.key == null) return
+
+    event = this._normalizeEvent(event)
 
     const keyPressHandlerStates = this._handlerStates[event.key]
     if (keyPressHandlerStates) {
@@ -348,16 +395,23 @@ export class Keystrokes<
       }
     }
 
-    const existingKeypress = this._activeKeyMap.get(event.key)
+    const identity = this._identityOf(event)
+    const existingKeypress = this._activeKeyMap.get(identity)
     if (existingKeypress) {
+      // The same physical key. Its label may have changed because a modifier was
+      // pressed or released while it was held, so refresh the entry rather than
+      // adding a second one that could never be released.
+      existingKeypress.key = event.key
+      existingKeypress.aliases = new Set(event.aliases)
       existingKeypress.event = event
     } else {
       const keypress = {
         key: event.key,
         aliases: new Set(event.aliases),
+        identity,
         event,
       }
-      this._activeKeyMap.set(event.key, keypress)
+      this._activeKeyMap.set(identity, keypress)
       this._activeKeyPresses.push(keypress)
     }
 
@@ -385,24 +439,36 @@ export class Keystrokes<
       }
 
       if (activatedCombos.length > 0) {
-        this._keyCombosPressedByKey.set(event.key, activatedCombos)
+        this._keyCombosPressedByKey.set(identity, activatedCombos)
       }
     }
   }
 
   private _handleKeyRelease(event: KeyEvent<OriginalEvent, KeyEventProps>) {
-    event = {
-      ...event,
-      key: event.key.toLowerCase(),
-      aliases: event.aliases?.map((a) => a.toLowerCase()) ?? [],
+    // A keyup can arrive without a key. Unlike a keydown we must not simply bail:
+    // the matching keydown may well have been tracked, and dropping its release is
+    // precisely what strands a key. Recover the label seen at keydown instead.
+    if (event.key == null) {
+      const tracked =
+        event.identity != null
+          ? this._activeKeyMap.get(event.identity)
+          : undefined
+      if (!tracked) return
+      event = { ...event, key: tracked.key, aliases: [...tracked.aliases] }
+    } else {
+      event = this._normalizeEvent(event)
     }
 
-    const remappedKey = this._keyRemap[event.key]
-    if (remappedKey) event.key = remappedKey
-    if (event.aliases) {
-      for (let i = 0; i < event.aliases.length; i += 1) {
-        const remappedAlias = this._keyRemap[event.aliases[i]]
-        if (remappedAlias) event.aliases[i] = remappedAlias
+    const identity = this._identityOf(event)
+    const activeKeyPress = this._activeKeyMap.get(identity)
+
+    // Release under the label reported at keydown. Handlers and combo states
+    // matched on that label, so releasing under a different one leaves them stuck.
+    if (activeKeyPress && activeKeyPress.key !== event.key) {
+      event = {
+        ...event,
+        key: activeKeyPress.key,
+        aliases: [...activeKeyPress.aliases],
       }
     }
 
@@ -417,10 +483,10 @@ export class Keystrokes<
       }
     }
 
-    if (this._activeKeyMap.has(event.key)) {
-      this._activeKeyMap.delete(event.key)
+    if (this._activeKeyMap.has(identity)) {
+      this._activeKeyMap.delete(identity)
       for (let i = 0; i < this._activeKeyPresses.length; i += 1) {
-        if (this._activeKeyPresses[i].key === event.key) {
+        if (this._identityOfKeyPress(this._activeKeyPresses[i]) === identity) {
           this._activeKeyPresses.splice(i, 1)
           i -= 1
           break
@@ -431,13 +497,19 @@ export class Keystrokes<
     this._tryReleaseSelfReleasingKeys()
     this._updateKeyComboStates()
 
-    const activatedCombos = this._keyCombosPressedByKey.get(event.key)
+    const activatedCombos = this._keyCombosPressedByKey.get(identity)
     if (activatedCombos) {
       for (const combo of activatedCombos) {
         combo.executeReleased(event)
       }
-      this._keyCombosPressedByKey.delete(event.key)
+      this._keyCombosPressedByKey.delete(identity)
     }
+  }
+
+  private _identityOfKeyPress(
+    keyPress: KeyPress<OriginalEvent, KeyEventProps>,
+  ) {
+    return keyPress.identity ?? keyPress.key
   }
 
   private _updateKeyComboStates() {

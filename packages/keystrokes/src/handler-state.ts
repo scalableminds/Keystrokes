@@ -1,6 +1,12 @@
 export type KeyEvent<OriginalEvent, KeyEventProps> = KeyEventProps & {
   key: string
   aliases?: string[]
+  // A stable id for the physical key, used to track which keys are held. `key`
+  // cannot serve that purpose because the label a browser reports depends on the
+  // modifiers held at the time: shift+slash reports "?" on keydown and, if shift
+  // is released first, "/" on keyup. The browser bindings pass event.code here.
+  // Falls back to `key` when absent, which keeps non-browser bindings working.
+  identity?: string
   originalEvent?: OriginalEvent
 }
 
