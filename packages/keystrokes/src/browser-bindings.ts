@@ -80,12 +80,24 @@ const maybeHandleMacOsCommandKeyReleased = (event: KeyboardEvent) => {
 
 const activeKeyEvents = new Map<string, KeyboardEvent>()
 
+// Keyed by the physical key rather than the reported label as this not stable. See README.
+const keyEventIdentity = (event: KeyboardEvent) => event.code || event.key
+
+// Composition keydowns (IME) and the placeholder keys some autofill
+// implementations emit never receive a matching keyup, so tracking them could
+// only ever strand a key. Note we never filter keyups: those can only ever
+// remove state, and dropping one is what strands a key in the first place.
+const cannotBeReleased = (event: KeyboardEvent) =>
+  event.isComposing === true ||
+  event.key === 'Process' ||
+  event.key === 'Unidentified'
+
 const addActiveKeyEvent = (event: KeyboardEvent) => {
-  activeKeyEvents.set(event.key, event)
+  activeKeyEvents.set(keyEventIdentity(event), event)
 }
 
 const removeActiveKeyEvent = (event: KeyboardEvent) => {
-  activeKeyEvents.delete(event.key)
+  activeKeyEvents.delete(keyEventIdentity(event))
 }
 
 const dispatchKeyUpForAllActiveKeys = () => {
@@ -118,8 +130,24 @@ export const browserOnInactiveBinder: OnActiveEventBinder = (handler) => {
       handler()
     }
 
+    // blur does not cover every way a page can stop receiving key events, and any
+    // keyup delivered elsewhere in the meantime is lost.
+    const visibilityHandler = () => {
+      const doc = getDoc() as Partial<Document>
+      if (doc.visibilityState === 'hidden') handlerWrapper()
+    }
+
     addEventListener('blur', handlerWrapper)
-    return () => removeEventListener('blur', handlerWrapper)
+    addEventListener('pagehide', handlerWrapper)
+    // visibilitychange is fired at the document, but it bubbles, so listening on
+    // the window keeps the document listener order untouched.
+    addEventListener('visibilitychange', visibilityHandler)
+
+    return () => {
+      removeEventListener('blur', handlerWrapper)
+      removeEventListener('pagehide', handlerWrapper)
+      removeEventListener('visibilitychange', visibilityHandler)
+    }
   } catch {}
 }
 
@@ -129,12 +157,15 @@ export const browserOnKeyPressedBinder: OnKeyEventBinder<
 > = (handler) => {
   try {
     const handlerWrapper = (e: KeyboardEvent) => {
+      if (cannotBeReleased(e)) return
+
       addActiveKeyEvent(e)
       maybeHandleMacOsCommandKeyPressed(e)
 
       handler({
         key: e.key,
         aliases: [`@${e.code}`],
+        identity: e.code || undefined,
         originalEvent: e,
         composedPath: () => e.composedPath(),
         preventDefault: () => e.preventDefault(),
@@ -157,6 +188,7 @@ export const browserOnKeyReleasedBinder: OnKeyEventBinder<
       handler({
         key: e.key,
         aliases: [`@${e.code}`],
+        identity: e.code || undefined,
         originalEvent: e,
         composedPath: () => e.composedPath(),
         preventDefault: () => e.preventDefault(),

@@ -688,3 +688,234 @@ describe('new Keystrokes(options)', () => {
     })
   })
 })
+
+// See the "differences from upstream" section of the readme.
+describe('/stale key state/', () => {
+  // Builds an event the way the browser bindings do: `identity` is the physical
+  // key (event.code) and `key` is the label, which changes with modifier state.
+  const ev = (key: string, code: string) =>
+    ({ key, aliases: [`@${code}`], identity: code }) as any
+
+  describe('key identity', () => {
+    it('leaves no phantom key when keydown and keyup report different keys', () => {
+      const keystrokes = createTestKeystrokes()
+      const bPressed = vi.fn()
+      keystrokes.bindKeyCombo('b', { onPressed: bPressed })
+
+      // Typing "?" and releasing shift before the slash key: the keydown reports
+      // "?" while the keyup reports "/".
+      keystrokes.press(ev('shift', 'ShiftLeft'))
+      keystrokes.press(ev('?', 'Slash'))
+      keystrokes.release(ev('shift', 'ShiftLeft'))
+      keystrokes.release(ev('/', 'Slash'))
+
+      expect(keystrokes.pressedKeys).toEqual([])
+
+      // A phantom key parked at the head of the active key presses would stop
+      // every single key combo from matching, for the rest of the session.
+      keystrokes.press(ev('b', 'KeyB'))
+      expect(bPressed).toBeCalledTimes(1)
+    })
+
+    it('releases a dead key whose keyup reports the composed character', () => {
+      const keystrokes = createTestKeystrokes()
+
+      // macOS option+e reports "Dead" on keydown and "e" on keyup.
+      keystrokes.press(ev('Dead', 'KeyE'))
+      keystrokes.release(ev('e', 'KeyE'))
+
+      expect(keystrokes.pressedKeys).toEqual([])
+    })
+
+    it('replaces rather than duplicates state when the key label changes mid press', () => {
+      const keystrokes = createTestKeystrokes()
+
+      keystrokes.press(ev('?', 'Slash'))
+      keystrokes.press(ev('/', 'Slash'))
+
+      expect(keystrokes.pressedKeys).toEqual(['/'])
+
+      keystrokes.release(ev('/', 'Slash'))
+
+      expect(keystrokes.pressedKeys).toEqual([])
+    })
+
+    // https://github.com/RobertWHurst/Keystrokes/issues/64
+    it('ignores a keydown carrying no key rather than throwing', () => {
+      const keystrokes = createTestKeystrokes()
+
+      expect(() => keystrokes.press({ identity: 'KeyB' } as any)).not.toThrow()
+      expect(keystrokes.pressedKeys).toEqual([])
+    })
+
+    // The obvious fix for the issue above — bailing out of both handlers — would
+    // strand the key here, which is the phantom bug all over again.
+    it('still releases a key when the keyup carries no key', () => {
+      const keystrokes = createTestKeystrokes()
+
+      keystrokes.press(ev('b', 'KeyB'))
+      expect(() =>
+        keystrokes.release({ identity: 'KeyB' } as any),
+      ).not.toThrow()
+
+      expect(keystrokes.pressedKeys).toEqual([])
+    })
+  })
+
+  describe('longest combo wins', () => {
+    const bindChordAndPlainKey = () => {
+      const keystrokes = createTestKeystrokes()
+      const chordPressed = vi.fn()
+      const chordReleased = vi.fn()
+      const plainPressed = vi.fn()
+      keystrokes.bindKeyCombo('control + k, b', {
+        onPressed: chordPressed,
+        onReleased: chordReleased,
+      })
+      keystrokes.bindKeyCombo('b', { onPressed: plainPressed })
+      return { keystrokes, chordPressed, chordReleased, plainPressed }
+    }
+
+    const typeChord = (
+      keystrokes: ReturnType<typeof bindChordAndPlainKey>['keystrokes'],
+    ) => {
+      keystrokes.press(ev('control', 'ControlLeft'))
+      keystrokes.press(ev('k', 'KeyK'))
+      keystrokes.release(ev('k', 'KeyK'))
+      keystrokes.release(ev('control', 'ControlLeft'))
+      keystrokes.press(ev('b', 'KeyB'))
+    }
+
+    it('suppresses the shorter combo while the longer combo is held', () => {
+      const { keystrokes, chordPressed, plainPressed } = bindChordAndPlainKey()
+
+      typeChord(keystrokes)
+
+      expect(chordPressed).toBeCalledTimes(1)
+      expect(plainPressed).toBeCalledTimes(0)
+    })
+
+    it('stops suppressing the shorter combo once the longer combo is released', () => {
+      const { keystrokes, chordReleased, plainPressed } = bindChordAndPlainKey()
+
+      typeChord(keystrokes)
+      keystrokes.release(ev('b', 'KeyB'))
+
+      expect(chordReleased).toBeCalledTimes(1)
+      expect(keystrokes.checkKeyCombo('control + k, b')).toBe(false)
+
+      keystrokes.press(ev('b', 'KeyB'))
+      expect(plainPressed).toBeCalledTimes(1)
+    })
+
+    it('recovers when the keyup completing the longer combo is never delivered', () => {
+      const { keystrokes, chordReleased, plainPressed } = bindChordAndPlainKey()
+
+      typeChord(keystrokes)
+      // The keyup for the final `b` is swallowed by the browser. Without a
+      // recovery path the chord stays pressed forever and, because it is longer,
+      // permanently suppresses every single key combo.
+      keystrokes.releaseAllKeys()
+
+      expect(keystrokes.pressedKeys).toEqual([])
+      expect(chordReleased).toBeCalledTimes(1)
+      expect(keystrokes.checkKeyCombo('control + k, b')).toBe(false)
+
+      keystrokes.press(ev('b', 'KeyB'))
+      expect(plainPressed).toBeCalledTimes(1)
+    })
+
+    // Documents current behaviour rather than a requirement: matching is
+    // positional, so an unrelated held key blocks single key combos. Intended for
+    // now — see NOTE[held-key-blocks-single-key-combos] in key-combo-state.ts.
+    it('does not fire a single key combo while an unrelated key is held', () => {
+      const keystrokes = createTestKeystrokes()
+      const bPressed = vi.fn()
+      keystrokes.bindKeyCombo('b', { onPressed: bPressed })
+
+      keystrokes.press(ev(' ', 'Space'))
+      keystrokes.press(ev('b', 'KeyB'))
+
+      expect(bPressed).toBeCalledTimes(0)
+    })
+  })
+
+  describe('#releaseAllKeys()', () => {
+    it('releases keys that are genuinely held', () => {
+      const keystrokes = createTestKeystrokes()
+      const released = vi.fn()
+      keystrokes.bindKeyCombo('b', { onReleased: released })
+
+      keystrokes.press(ev('b', 'KeyB'))
+      keystrokes.releaseAllKeys()
+
+      expect(keystrokes.pressedKeys).toEqual([])
+      expect(released).toBeCalledTimes(1)
+    })
+
+    it('resets a combo left part way through its sequence', () => {
+      const keystrokes = createTestKeystrokes()
+      const chordPressed = vi.fn()
+      const plainPressed = vi.fn()
+      keystrokes.bindKeyCombo('control + k, m', { onPressed: chordPressed })
+      keystrokes.bindKeyCombo('m', { onPressed: plainPressed })
+
+      keystrokes.press(ev('control', 'ControlLeft'))
+      keystrokes.press(ev('k', 'KeyK'))
+      keystrokes.release(ev('k', 'KeyK'))
+      keystrokes.release(ev('control', 'ControlLeft'))
+      keystrokes.releaseAllKeys()
+
+      keystrokes.press(ev('m', 'KeyM'))
+
+      expect(chordPressed).toBeCalledTimes(0)
+      expect(plainPressed).toBeCalledTimes(1)
+    })
+  })
+
+  describe('partially typed combos', () => {
+    const setup = () => {
+      const keystrokes = createTestKeystrokes()
+      const chordPressed = vi.fn()
+      const plainPressed = vi.fn()
+      keystrokes.bindKeyCombo('control + k, m', { onPressed: chordPressed })
+      keystrokes.bindKeyCombo('m', { onPressed: plainPressed })
+      keystrokes.press(ev('control', 'ControlLeft'))
+      keystrokes.press(ev('k', 'KeyK'))
+      keystrokes.release(ev('k', 'KeyK'))
+      keystrokes.release(ev('control', 'ControlLeft'))
+      return { keystrokes, chordPressed, plainPressed }
+    }
+
+    it('completes the combo within the sequence timeout', () => {
+      vi.useFakeTimers()
+      try {
+        const { keystrokes, chordPressed, plainPressed } = setup()
+
+        keystrokes.press(ev('m', 'KeyM'))
+
+        expect(chordPressed).toBeCalledTimes(1)
+        expect(plainPressed).toBeCalledTimes(0)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('expires the combo once the sequence timeout has passed', () => {
+      vi.useFakeTimers()
+      try {
+        const { keystrokes, chordPressed, plainPressed } = setup()
+
+        vi.advanceTimersByTime(keystrokes.sequenceTimeout + 1)
+        keystrokes.press(ev('m', 'KeyM'))
+
+        // Otherwise a stray control+k swallows whichever single key is pressed
+        // next, however many minutes later that happens to be.
+        expect(chordPressed).toBeCalledTimes(0)
+        expect(plainPressed).toBeCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+})

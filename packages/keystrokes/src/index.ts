@@ -73,6 +73,10 @@ export const checkKey: typeof globalKeystrokes.checkKey = (...args) =>
 export const checkKeyCombo: typeof globalKeystrokes.checkKeyCombo = (...args) =>
   getGlobalKeystrokes().checkKeyCombo(...args)
 
+export const releaseAllKeys: typeof globalKeystrokes.releaseAllKeys = (
+  ...args
+) => getGlobalKeystrokes().releaseAllKeys(...args)
+
 export const normalizeKeyCombo = KeyComboState.normalizeKeyCombo
 export const stringifyKeyCombo = KeyComboState.stringifyKeyCombo
 export const parseKeyCombo = KeyComboState.parseKeyCombo
