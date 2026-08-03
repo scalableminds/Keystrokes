@@ -1,6 +1,7 @@
 export type KeyEvent<OriginalEvent, KeyEventProps> = KeyEventProps & {
     key: string;
     aliases?: string[];
+    identity?: string;
     originalEvent?: OriginalEvent;
 };
 export type HandlerFn<Event> = (event: Event) => void;

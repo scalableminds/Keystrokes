@@ -1,17 +1,17 @@
-var w = Object.defineProperty;
-var R = (n, e, s) => e in n ? w(n, e, { enumerable: !0, configurable: !0, writable: !0, value: s }) : n[e] = s;
-var r = (n, e, s) => (R(n, typeof e != "symbol" ? e + "" : e, s), s);
-const A = {
+var E = Object.defineProperty;
+var w = (a, e, t) => e in a ? E(a, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : a[e] = t;
+var r = (a, e, t) => (w(a, typeof e != "symbol" ? e + "" : e, t), t);
+const R = {
   /*
   eslint-disable
     @typescript-eslint/no-empty-function,
     @typescript-eslint/no-unused-vars
   */
-  addEventListener: (...n) => {
+  addEventListener: (...a) => {
   },
-  removeEventListener: (...n) => {
+  removeEventListener: (...a) => {
   },
-  dispatchEvent: (...n) => {
+  dispatchEvent: (...a) => {
   }
   /*
   eslint-enable
@@ -20,69 +20,75 @@ const A = {
   */
 }, x = {
   userAgent: ""
-}, K = () => typeof document < "u" ? document : A, E = () => typeof navigator < "u" ? navigator : x, q = () => E().userAgent.toLowerCase().includes("mac");
-let C = !1;
-const B = (n) => {
-  !q() || n.key !== "Meta" || (C = !0);
-}, I = (n) => {
-  !C || n.key !== "Meta" || (C = !1, P());
-}, b = /* @__PURE__ */ new Map(), M = (n) => {
-  b.set(n.key, n);
-}, L = (n) => {
-  b.delete(n.key);
-}, P = () => {
-  for (const n of b.values()) {
+}, p = () => typeof document < "u" ? document : R, q = () => typeof navigator < "u" ? navigator : x, B = () => q().userAgent.toLowerCase().includes("mac");
+let v = !1;
+const M = (a) => {
+  !B() || a.key !== "Meta" || (v = !0);
+}, I = (a) => {
+  !v || a.key !== "Meta" || (v = !1, k());
+}, b = /* @__PURE__ */ new Map(), P = (a) => a.code || a.key, L = (a) => a.isComposing === !0 || a.key === "Process" || a.key === "Unidentified", W = (a) => {
+  b.set(P(a), a);
+}, O = (a) => {
+  b.delete(P(a));
+}, k = () => {
+  for (const a of b.values()) {
     const e = new KeyboardEvent("keyup", {
-      key: n.key,
-      code: n.code,
+      key: a.key,
+      code: a.code,
       bubbles: !0,
       cancelable: !0
     });
-    K().dispatchEvent(e);
+    p().dispatchEvent(e);
   }
   b.clear();
-}, W = (n) => {
+}, z = (a) => {
   try {
-    const e = () => n();
+    const e = () => a();
     return addEventListener("focus", e), () => {
       removeEventListener("focus", e);
     };
   } catch {
   }
-}, O = (n) => {
+}, U = (a) => {
   try {
     const e = () => {
-      P(), n();
+      k(), a();
+    }, t = () => {
+      p().visibilityState === "hidden" && e();
     };
-    return addEventListener("blur", e), () => removeEventListener("blur", e);
+    return addEventListener("blur", e), addEventListener("pagehide", e), addEventListener("visibilitychange", t), () => {
+      removeEventListener("blur", e), removeEventListener("pagehide", e), removeEventListener("visibilitychange", t);
+    };
   } catch {
   }
-}, z = (n) => {
+}, F = (a) => {
   try {
-    const e = (s) => {
-      M(s), B(s), n({
-        key: s.key,
-        aliases: [`@${s.code}`],
-        originalEvent: s,
-        composedPath: () => s.composedPath(),
-        preventDefault: () => s.preventDefault()
-      });
+    const e = (t) => {
+      L(t) || (W(t), M(t), a({
+        key: t.key,
+        aliases: [`@${t.code}`],
+        identity: t.code || void 0,
+        originalEvent: t,
+        composedPath: () => t.composedPath(),
+        preventDefault: () => t.preventDefault()
+      }));
     };
-    return K().addEventListener("keydown", e), () => K().removeEventListener("keydown", e);
+    return p().addEventListener("keydown", e), () => p().removeEventListener("keydown", e);
   } catch {
   }
-}, T = (n) => {
+}, H = (a) => {
   try {
-    const e = (s) => {
-      L(s), I(s), n({
-        key: s.key,
-        aliases: [`@${s.code}`],
-        originalEvent: s,
-        composedPath: () => s.composedPath(),
-        preventDefault: () => s.preventDefault()
+    const e = (t) => {
+      O(t), I(t), a({
+        key: t.key,
+        aliases: [`@${t.code}`],
+        identity: t.code || void 0,
+        originalEvent: t,
+        composedPath: () => t.composedPath(),
+        preventDefault: () => t.preventDefault()
       });
     };
-    return K().addEventListener("keyup", e), () => K().removeEventListener("keyup", e);
+    return p().addEventListener("keyup", e), () => p().removeEventListener("keyup", e);
   } catch {
   }
 };
@@ -102,55 +108,56 @@ class g {
     return this._identity === e;
   }
   executePressed(e) {
-    var s, t;
-    this._isPressed || (s = this._onPressed) == null || s.call(this, e), this._isPressed = !0, (t = this._onPressedWithRepeat) == null || t.call(this, e);
+    var t, s;
+    this._isPressed || (t = this._onPressed) == null || t.call(this, e), this._isPressed = !0, (s = this._onPressedWithRepeat) == null || s.call(this, e);
   }
   executeReleased(e) {
-    var s;
-    this._isPressed && ((s = this._onReleased) == null || s.call(this, e)), this._isPressed = !1;
+    var t;
+    this._isPressed && ((t = this._onReleased) == null || t.call(this, e)), this._isPressed = !1;
   }
 }
-const y = class y {
-  constructor(e, s, t = {}) {
+const l = class l {
+  constructor(e, t, s = {}) {
     r(this, "_normalizedKeyCombo");
     r(this, "_parsedKeyCombo");
     r(this, "_handlerState");
     r(this, "_keyComboEventMapper");
     r(this, "_movingToNextSequenceAt");
     r(this, "_sequenceIndex");
+    r(this, "_sequenceAdvancedAt");
     r(this, "_unitIndex");
     r(this, "_lastActiveKeyPresses");
     r(this, "_lastActiveKeyCount");
     r(this, "_isPressedWithFinalUnit");
-    this._normalizedKeyCombo = y.normalizeKeyCombo(e), this._parsedKeyCombo = y.parseKeyCombo(e), this._handlerState = new g(t), this._keyComboEventMapper = s, this._movingToNextSequenceAt = 0, this._sequenceIndex = 0, this._unitIndex = 0, this._lastActiveKeyPresses = [], this._lastActiveKeyCount = 0, this._isPressedWithFinalUnit = null;
+    this._normalizedKeyCombo = l.normalizeKeyCombo(e), this._parsedKeyCombo = l.parseKeyCombo(e), this._handlerState = new g(s), this._keyComboEventMapper = t, this._movingToNextSequenceAt = 0, this._sequenceIndex = 0, this._sequenceAdvancedAt = 0, this._unitIndex = 0, this._lastActiveKeyPresses = [], this._lastActiveKeyCount = 0, this._isPressedWithFinalUnit = null;
   }
   static parseKeyCombo(e) {
-    if (y._parseCache[e])
-      return y._parseCache[e];
-    const s = e.toLowerCase();
-    let t = "", i = [], a = [i], o = [a];
-    const c = [o];
+    if (l._parseCache[e])
+      return l._parseCache[e];
+    const t = e.toLowerCase();
+    let s = "", i = [], o = [i], n = [o];
+    const d = [n];
     let h = !1;
-    for (let l = 0; l < e.length; l += 1)
-      if (s[l] === "\\")
+    for (let c = 0; c < e.length; c += 1)
+      if (t[c] === "\\")
         h = !0;
-      else if ((s[l] === "+" || s[l] === ">" || s[l] === ",") && !h) {
-        if (t)
+      else if ((t[c] === "+" || t[c] === ">" || t[c] === ",") && !h) {
+        if (s)
           throw new Error("cannot have two operators in a row");
-        t = s[l];
+        s = t[c];
       } else
-        s[l].match(/[^\s]/) && (t && (t === "," ? (i = [], a = [i], o = [a], c.push(o)) : t === ">" ? (i = [], a = [i], o.push(a)) : t === "+" && (i = [], a.push(i)), t = ""), h = !1, i.push(s[l]));
-    const d = c.map((l) => l.map((m) => m.map((f) => f.join(""))));
-    return y._parseCache[e] = d, d;
+        t[c].match(/[^\s]/) && (s && (s === "," ? (i = [], o = [i], n = [o], d.push(n)) : s === ">" ? (i = [], o = [i], n.push(o)) : s === "+" && (i = [], o.push(i)), s = ""), h = !1, i.push(t[c]));
+    const _ = d.map((c) => c.map((f) => f.map((m) => m.join(""))));
+    return l._parseCache[e] = _, _;
   }
   static stringifyKeyCombo(e) {
-    return e.map((s) => s.map((t) => t.map((i) => i === "+" ? "\\+" : i === ">" ? "\\>" : i === "," ? "\\," : i).join("+")).join(">")).join(",");
+    return e.map((t) => t.map((s) => s.map((i) => i === "+" ? "\\+" : i === ">" ? "\\>" : i === "," ? "\\," : i).join("+")).join(">")).join(",");
   }
   static normalizeKeyCombo(e) {
-    if (y._normalizationCache[e])
-      return y._normalizationCache[e];
-    const s = this.stringifyKeyCombo(this.parseKeyCombo(e));
-    return y._normalizationCache[e] = s, s;
+    if (l._normalizationCache[e])
+      return l._normalizationCache[e];
+    const t = this.stringifyKeyCombo(this.parseKeyCombo(e));
+    return l._normalizationCache[e] = t, t;
   }
   get isPressed() {
     return !!this._isPressedWithFinalUnit;
@@ -161,14 +168,34 @@ const y = class y {
   get sequenceLength() {
     return this._parsedKeyCombo.length;
   }
+  /**
+   * Releases the combo if it is pressed and abandons any progress through its
+   * sequence.
+   *
+   * Both halves matter. A combo waiting part way through its sequence — "control
+   * + k" typed but not yet completed — is armed without being pressed, so nothing
+   * in the normal release path touches it, and it would otherwise swallow whatever
+   * key is pressed next, however much later.
+   */
+  forceRelease(e) {
+    this._isPressedWithFinalUnit && (e && this._handlerState.executeReleased(this._wrapEvent(this._lastActiveKeyPresses, {
+      key: e.key,
+      aliases: new Set(e.aliases),
+      identity: e.identity,
+      event: e
+    })), this._isPressedWithFinalUnit = null), this._resetProgress();
+  }
+  _resetProgress() {
+    this._movingToNextSequenceAt = 0, this._sequenceIndex = 0, this._sequenceAdvancedAt = 0, this._unitIndex = 0, this._lastActiveKeyPresses.length = 0;
+  }
   isOwnHandler(e) {
     return this._handlerState.isOwnHandler(e);
   }
   executePressed(e) {
-    var s, t;
-    !((s = this._isPressedWithFinalUnit) != null && s.has(e.key)) && !((t = e.aliases) != null && t.some((i) => {
-      var a;
-      return (a = this._isPressedWithFinalUnit) == null ? void 0 : a.has(i);
+    var t, s;
+    !((t = this._isPressedWithFinalUnit) != null && t.has(e.key)) && !((s = e.aliases) != null && s.some((i) => {
+      var o;
+      return (o = this._isPressedWithFinalUnit) == null ? void 0 : o.has(i);
     })) || this._handlerState.executePressed(this._wrapEvent(this._lastActiveKeyPresses, {
       key: e.key,
       aliases: new Set(e.aliases),
@@ -176,80 +203,82 @@ const y = class y {
     }));
   }
   executeReleased(e) {
-    var s, t;
-    !((s = this._isPressedWithFinalUnit) != null && s.has(e.key)) && !((t = e.aliases) != null && t.some((i) => {
-      var a;
-      return (a = this._isPressedWithFinalUnit) == null ? void 0 : a.has(i);
+    var t, s;
+    !((t = this._isPressedWithFinalUnit) != null && t.has(e.key)) && !((s = e.aliases) != null && s.some((i) => {
+      var o;
+      return (o = this._isPressedWithFinalUnit) == null ? void 0 : o.has(i);
     })) || (this._handlerState.executeReleased(this._wrapEvent(this._lastActiveKeyPresses, {
       key: e.key,
       aliases: new Set(e.aliases),
       event: e
     })), this._isPressedWithFinalUnit = null);
   }
-  updateState(e, s) {
-    const t = e.length, i = t < this._lastActiveKeyCount;
-    this._lastActiveKeyCount = t;
-    const a = this._parsedKeyCombo[this._sequenceIndex], o = a.slice(0, this._unitIndex), c = a.slice(this._unitIndex), h = () => {
-      this._movingToNextSequenceAt = 0, this._sequenceIndex = 0, this._unitIndex = 0, this._lastActiveKeyPresses.length = 0, this._handlerState.isEmpty && (this._isPressedWithFinalUnit = null);
+  updateState(e, t) {
+    const s = e.length, i = s < this._lastActiveKeyCount;
+    this._lastActiveKeyCount = s;
+    const o = () => {
+      this._resetProgress(), this._handlerState.isEmpty && (this._isPressedWithFinalUnit = null);
     };
-    let d = 0;
+    this._sequenceAdvancedAt !== 0 && this._sequenceAdvancedAt + t < Date.now() && o();
+    const n = this._parsedKeyCombo[this._sequenceIndex], d = n.slice(0, this._unitIndex), h = n.slice(this._unitIndex);
+    let _ = 0;
     if (i) {
       if (this._movingToNextSequenceAt === 0)
-        return h();
-      if (this._movingToNextSequenceAt + s < Date.now() || t !== 0)
+        return o();
+      if (this._movingToNextSequenceAt + t < Date.now() || s !== 0)
         return;
-      this._movingToNextSequenceAt = 0, this._sequenceIndex += 1, this._unitIndex = 0;
+      this._movingToNextSequenceAt = 0, this._sequenceIndex += 1, this._sequenceAdvancedAt = Date.now(), this._unitIndex = 0;
       return;
     }
-    for (const l of o) {
-      for (const m of l) {
-        let f = !1;
-        for (let _ = d; _ < e.length && _ < d + l.length; _ += 1)
-          if (e[_].key === m || e[_].aliases.has(m)) {
-            f = !0;
+    for (const c of d) {
+      for (const f of c) {
+        let m = !1;
+        for (let y = _; y < e.length && y < _ + c.length; y += 1)
+          if (e[y].key === f || e[y].aliases.has(f)) {
+            m = !0;
             break;
           }
-        if (!f)
-          return h();
+        if (!m)
+          return o();
       }
-      d += l.length;
+      _ += c.length;
     }
     if (this._movingToNextSequenceAt === 0) {
-      for (const l of c) {
-        for (const m of l) {
-          let f = !1;
-          for (let _ = d; _ < e.length && _ < d + l.length; _ += 1)
-            if (e[_].key === m || e[_].aliases.has(m)) {
-              f = !0;
+      for (const c of h) {
+        for (const f of c) {
+          let m = !1;
+          for (let y = _; y < e.length && y < _ + c.length; y += 1)
+            if (e[y].key === f || e[y].aliases.has(f)) {
+              m = !0;
               break;
             }
-          if (!f)
+          if (!m)
             return;
         }
-        this._unitIndex += 1, d += l.length;
+        this._unitIndex += 1, _ += c.length;
       }
-      if (d < t - 1)
-        return h();
+      if (_ < s - 1)
+        return o();
       if (this._lastActiveKeyPresses[this._sequenceIndex] = e.slice(0), this._sequenceIndex < this._parsedKeyCombo.length - 1) {
         this._movingToNextSequenceAt = Date.now();
         return;
       }
-      this._isPressedWithFinalUnit = new Set(a[a.length - 1]);
+      this._isPressedWithFinalUnit = new Set(n[n.length - 1]), this._sequenceAdvancedAt = 0;
     }
   }
-  _wrapEvent(e, s) {
+  _wrapEvent(e, t) {
     return {
-      ...this._keyComboEventMapper(e, s),
+      ...this._keyComboEventMapper(e, t),
       keyCombo: this._normalizedKeyCombo,
       keyEvents: e.flat().map((i) => i.event),
-      finalKeyEvent: s.event
+      finalKeyEvent: t.event
     };
   }
 };
-r(y, "_parseCache", {}), r(y, "_normalizationCache", {});
-let u = y;
-const U = 1e3;
-class v {
+r(l, "_parseCache", {}), r(l, "_normalizationCache", {});
+let u = l;
+const T = 1e3;
+class S {
   constructor(e = {}) {
     r(this, "sequenceTimeout");
     r(this, "_isActive");
@@ -268,7 +297,7 @@ class v {
     r(this, "_activeKeyMap");
     r(this, "_watchedKeyComboStates");
     r(this, "_keyCombosPressedByKey");
-    this.sequenceTimeout = U, this._isActive = !0, this._onActiveBinder = () => {
+    this.sequenceTimeout = T, this._isActive = !0, this._onActiveBinder = () => {
     }, this._onInactiveBinder = () => {
     }, this._onKeyPressedBinder = () => {
     }, this._onKeyReleasedBinder = () => {
@@ -277,64 +306,64 @@ class v {
   get pressedKeys() {
     return this._activeKeyPresses.map((e) => e.key);
   }
-  bindKey(e, s) {
+  bindKey(e, t) {
     var i;
     if (typeof e == "object") {
-      for (const a of e)
-        this.bindKey(a, s);
+      for (const o of e)
+        this.bindKey(o, t);
       return;
     }
     e = e.toLowerCase();
-    const t = new g(s);
-    (i = this._handlerStates)[e] ?? (i[e] = []), this._handlerStates[e].push(t);
+    const s = new g(t);
+    (i = this._handlerStates)[e] ?? (i[e] = []), this._handlerStates[e].push(s);
   }
-  unbindKey(e, s) {
+  unbindKey(e, t) {
     if (typeof e == "object") {
       for (const i of e)
-        this.unbindKey(i, s);
+        this.unbindKey(i, t);
       return;
     }
     e = e.toLowerCase();
-    const t = this._handlerStates[e];
-    if (t)
-      if (s)
-        for (let i = 0; i < t.length; i += 1)
-          t[i].isOwnHandler(s) && (t.splice(i, 1), i -= 1);
+    const s = this._handlerStates[e];
+    if (s)
+      if (t)
+        for (let i = 0; i < s.length; i += 1)
+          s[i].isOwnHandler(t) && (s.splice(i, 1), i -= 1);
       else
-        t.length = 0;
+        s.length = 0;
   }
-  bindKeyCombo(e, s) {
+  bindKeyCombo(e, t) {
     var i;
     if (typeof e == "object") {
-      for (const a of e)
-        this.bindKeyCombo(a, s);
+      for (const o of e)
+        this.bindKeyCombo(o, t);
       return;
     }
     e = u.normalizeKeyCombo(e);
-    const t = new u(e, this._keyComboEventMapper, s);
-    (i = this._keyComboStates)[e] ?? (i[e] = []), this._keyComboStates[e].push(t), this._keyComboStatesArray.push(t);
+    const s = new u(e, this._keyComboEventMapper, t);
+    (i = this._keyComboStates)[e] ?? (i[e] = []), this._keyComboStates[e].push(s), this._keyComboStatesArray.push(s);
   }
-  unbindKeyCombo(e, s) {
+  unbindKeyCombo(e, t) {
     if (typeof e == "object") {
       for (const i of e)
-        this.unbindKeyCombo(i, s);
+        this.unbindKeyCombo(i, t);
       return;
     }
     e = u.normalizeKeyCombo(e);
-    const t = this._keyComboStates[e];
-    if (t)
-      if (s) {
-        for (let i = 0; i < t.length; i += 1)
-          if (t[i].isOwnHandler(s)) {
-            for (let a = 0; a < this._keyComboStatesArray.length; a += 1)
-              this._keyComboStatesArray[a] === t[i] && (this._keyComboStatesArray.splice(a, 1), a -= 1);
-            t.splice(i, 1), i -= 1;
+    const s = this._keyComboStates[e];
+    if (s)
+      if (t) {
+        for (let i = 0; i < s.length; i += 1)
+          if (s[i].isOwnHandler(t)) {
+            for (let o = 0; o < this._keyComboStatesArray.length; o += 1)
+              this._keyComboStatesArray[o] === s[i] && (this._keyComboStatesArray.splice(o, 1), o -= 1);
+            s.splice(i, 1), i -= 1;
           }
       } else
-        t.length = 0;
+        s.length = 0;
   }
   checkKey(e) {
-    return e = e.toLowerCase(), this._activeKeyPresses.some((s) => s.key === e || s.aliases.has(e));
+    return e = e.toLowerCase(), this._activeKeyPresses.some((t) => t.key === e || t.aliases.has(e));
   }
   checkKeyCombo(e) {
     return this._ensureCachedKeyComboState(e).isPressed;
@@ -343,112 +372,142 @@ class v {
     return this._ensureCachedKeyComboState(e).sequenceIndex;
   }
   bindEnvironment(e = {}) {
-    this.unbindEnvironment(), this._onActiveBinder = e.onActive ?? W, this._onInactiveBinder = e.onInactive ?? O, this._onKeyPressedBinder = e.onKeyPressed ?? z, this._onKeyReleasedBinder = e.onKeyReleased ?? T, this._keyComboEventMapper = e.mapKeyComboEvent ?? (() => ({})), this._selfReleasingKeys = e.selfReleasingKeys ?? [], this._keyRemap = e.keyRemap ?? {};
-    const s = this._onActiveBinder(() => {
+    this.unbindEnvironment(), this._onActiveBinder = e.onActive ?? z, this._onInactiveBinder = e.onInactive ?? U, this._onKeyPressedBinder = e.onKeyPressed ?? F, this._onKeyReleasedBinder = e.onKeyReleased ?? H, this._keyComboEventMapper = e.mapKeyComboEvent ?? (() => ({})), this._selfReleasingKeys = e.selfReleasingKeys ?? [], this._keyRemap = e.keyRemap ?? {};
+    const t = this._onActiveBinder(() => {
       this._isActive = !0;
-    }), t = this._onInactiveBinder(() => {
-      this._isActive = !1;
-    }), i = this._onKeyPressedBinder((o) => {
-      this._handleKeyPress(o);
-    }), a = this._onKeyReleasedBinder((o) => {
-      this._handleKeyRelease(o);
+    }), s = this._onInactiveBinder(() => {
+      this._isActive = !1, this.releaseAllKeys();
+    }), i = this._onKeyPressedBinder((n) => {
+      this._handleKeyPress(n);
+    }), o = this._onKeyReleasedBinder((n) => {
+      this._handleKeyRelease(n);
     });
     this._unbinder = () => {
-      s == null || s(), t == null || t(), i == null || i(), a == null || a();
+      t == null || t(), s == null || s(), i == null || i(), o == null || o();
     };
   }
   unbindEnvironment() {
     var e;
     (e = this._unbinder) == null || e.call(this);
   }
+  /**
+   * Releases every key currently believed to be held and abandons any progress
+   * through a key combo. Call this whenever keyups may have been missed — the
+   * page regaining focus, or a modal that stopped propagation of key events.
+   *
+   * Without a way to do this a single missed keyup is unrecoverable: a stranded
+   * key stops all single key combos from matching, and a combo left marked as
+   * pressed keeps suppressing shorter combos (see the readme).
+   */
+  releaseAllKeys() {
+    var s;
+    const e = [...this._activeKeyPresses];
+    for (const i of e)
+      this._handleKeyRelease(i.event);
+    const t = (s = e[e.length - 1]) == null ? void 0 : s.event;
+    for (const i of this._keyComboStatesArray)
+      i.forceRelease(t);
+    this._activeKeyPresses.length = 0, this._activeKeyMap.clear(), this._keyCombosPressedByKey.clear(), this._updateKeyComboStates();
+  }
   _ensureCachedKeyComboState(e) {
     e = u.normalizeKeyCombo(e), this._watchedKeyComboStates[e] || (this._watchedKeyComboStates[e] = new u(e, this._keyComboEventMapper));
-    const s = this._watchedKeyComboStates[e];
-    return s.updateState(this._activeKeyPresses, this.sequenceTimeout), s;
+    const t = this._watchedKeyComboStates[e];
+    return t.updateState(this._activeKeyPresses, this.sequenceTimeout), t;
   }
-  _handleKeyPress(e) {
-    var o;
-    if (!this._isActive)
-      return;
-    e = {
+  _normalizeEvent(e) {
+    var i;
+    const t = {
       ...e,
       key: e.key.toLowerCase(),
-      aliases: ((o = e.aliases) == null ? void 0 : o.map((c) => c.toLowerCase())) ?? []
-    };
-    const s = this._keyRemap[e.key];
-    s && (e.key = s);
-    for (let c = 0; c < e.aliases.length; c += 1) {
-      const h = this._keyRemap[e.aliases[c]];
-      h && (e.aliases[c] = h);
+      aliases: ((i = e.aliases) == null ? void 0 : i.map((o) => o.toLowerCase())) ?? []
+    }, s = this._keyRemap[t.key];
+    s && (t.key = s);
+    for (let o = 0; o < t.aliases.length; o += 1) {
+      const n = this._keyRemap[t.aliases[o]];
+      n && (t.aliases[o] = n);
     }
+    return t;
+  }
+  _identityOf(e) {
+    return e.identity ?? e.key;
+  }
+  _handleKeyPress(e) {
+    if (!this._isActive || e.key == null)
+      return;
+    e = this._normalizeEvent(e);
     const t = this._handlerStates[e.key];
     if (t)
-      for (const c of t)
-        c.executePressed(e);
-    for (let c = 0; c < e.aliases.length; c += 1) {
-      const h = this._handlerStates[e.aliases[c]];
-      if (h)
-        for (const d of h)
-          d.executePressed(e);
+      for (const n of t)
+        n.executePressed(e);
+    for (let n = 0; n < e.aliases.length; n += 1) {
+      const d = this._handlerStates[e.aliases[n]];
+      if (d)
+        for (const h of d)
+          h.executePressed(e);
     }
-    const i = this._activeKeyMap.get(e.key);
+    const s = this._identityOf(e), i = this._activeKeyMap.get(s);
     if (i)
-      i.event = e;
+      i.key = e.key, i.aliases = new Set(e.aliases), i.event = e;
     else {
-      const c = {
+      const n = {
         key: e.key,
         aliases: new Set(e.aliases),
+        identity: s,
         event: e
       };
-      this._activeKeyMap.set(e.key, c), this._activeKeyPresses.push(c);
+      this._activeKeyMap.set(s, n), this._activeKeyPresses.push(n);
     }
     this._updateKeyComboStates();
-    const a = this._keyComboStatesArray.filter((c) => c.isPressed);
-    if (a.length > 0) {
-      const c = Math.max(...a.map((d) => d.sequenceLength)), h = [];
-      for (const d of a)
-        d.sequenceLength === c && (d.executePressed(e), h.push(d));
-      h.length > 0 && this._keyCombosPressedByKey.set(e.key, h);
+    const o = this._keyComboStatesArray.filter((n) => n.isPressed);
+    if (o.length > 0) {
+      const n = Math.max(...o.map((h) => h.sequenceLength)), d = [];
+      for (const h of o)
+        h.sequenceLength === n && (h.executePressed(e), d.push(h));
+      d.length > 0 && this._keyCombosPressedByKey.set(s, d);
     }
   }
   _handleKeyRelease(e) {
-    var a;
-    e = {
+    if (e.key == null) {
+      const n = e.identity != null ? this._activeKeyMap.get(e.identity) : void 0;
+      if (!n)
+        return;
+      e = { ...e, key: n.key, aliases: [...n.aliases] };
+    } else
+      e = this._normalizeEvent(e);
+    const t = this._identityOf(e), s = this._activeKeyMap.get(t);
+    s && s.key !== e.key && (e = {
       ...e,
-      key: e.key.toLowerCase(),
-      aliases: ((a = e.aliases) == null ? void 0 : a.map((o) => o.toLowerCase())) ?? []
-    };
-    const s = this._keyRemap[e.key];
-    if (s && (e.key = s), e.aliases)
-      for (let o = 0; o < e.aliases.length; o += 1) {
-        const c = this._keyRemap[e.aliases[o]];
-        c && (e.aliases[o] = c);
-      }
-    const t = this._handlerStates[e.key];
-    if (t)
-      for (const o of t)
-        o.executeReleased(e);
-    for (let o = 0; o < e.aliases.length; o += 1) {
-      const c = this._handlerStates[e.aliases[o]];
-      if (c)
-        for (const h of c)
+      key: s.key,
+      aliases: [...s.aliases]
+    });
+    const i = this._handlerStates[e.key];
+    if (i)
+      for (const n of i)
+        n.executeReleased(e);
+    for (let n = 0; n < e.aliases.length; n += 1) {
+      const d = this._handlerStates[e.aliases[n]];
+      if (d)
+        for (const h of d)
           h.executeReleased(e);
     }
-    if (this._activeKeyMap.has(e.key)) {
-      this._activeKeyMap.delete(e.key);
-      for (let o = 0; o < this._activeKeyPresses.length; o += 1)
-        if (this._activeKeyPresses[o].key === e.key) {
-          this._activeKeyPresses.splice(o, 1), o -= 1;
+    if (this._activeKeyMap.has(t)) {
+      this._activeKeyMap.delete(t);
+      for (let n = 0; n < this._activeKeyPresses.length; n += 1)
+        if (this._identityOfKeyPress(this._activeKeyPresses[n]) === t) {
+          this._activeKeyPresses.splice(n, 1), n -= 1;
           break;
         }
     }
     this._tryReleaseSelfReleasingKeys(), this._updateKeyComboStates();
-    const i = this._keyCombosPressedByKey.get(e.key);
-    if (i) {
-      for (const o of i)
-        o.executeReleased(e);
-      this._keyCombosPressedByKey.delete(e.key);
+    const o = this._keyCombosPressedByKey.get(t);
+    if (o) {
+      for (const n of o)
+        n.executeReleased(e);
+      this._keyCombosPressedByKey.delete(t);
     }
+  }
+  _identityOfKeyPress(e) {
+    return e.identity ?? e.key;
   }
   _updateKeyComboStates() {
     for (const e of this._keyComboStatesArray)
@@ -456,66 +515,67 @@ class v {
   }
   _tryReleaseSelfReleasingKeys() {
     for (const e of this._activeKeyPresses)
-      for (const s of this._selfReleasingKeys)
-        e.key === s && this._handleKeyRelease(e.event);
+      for (const t of this._selfReleasingKeys)
+        e.key === t && this._handleKeyRelease(e.event);
   }
 }
-let S, k;
-const F = (n) => {
-  k = n ?? new v(S);
-}, p = () => (k || F(), k), j = (n) => {
-  S = n;
-}, N = (...n) => p().bindKey(...n), D = (...n) => p().unbindKey(...n), G = (...n) => p().bindKeyCombo(...n), $ = (...n) => p().unbindKeyCombo(...n), J = (...n) => p().checkKey(...n), Q = (...n) => p().checkKeyCombo(...n), V = u.normalizeKeyCombo, X = u.stringifyKeyCombo, Y = u.parseKeyCombo, Z = (n = {}) => {
-  let e, s, t, i;
-  return Object.assign(new v({
-    ...n,
-    onActive(o) {
-      e = o;
+let A, C;
+const j = (a) => {
+  C = a ?? new S(A);
+}, K = () => (C || j(), C), N = (a) => {
+  A = a;
+}, G = (...a) => K().bindKey(...a), $ = (...a) => K().unbindKey(...a), J = (...a) => K().bindKeyCombo(...a), Q = (...a) => K().unbindKeyCombo(...a), V = (...a) => K().checkKey(...a), X = (...a) => K().checkKeyCombo(...a), Y = (...a) => K().releaseAllKeys(...a), Z = u.normalizeKeyCombo, ee = u.stringifyKeyCombo, te = u.parseKeyCombo, se = (a = {}) => {
+  let e, t, s, i;
+  return Object.assign(new S({
+    ...a,
+    onActive(n) {
+      e = n;
     },
-    onInactive(o) {
-      s = o;
+    onInactive(n) {
+      t = n;
     },
-    onKeyPressed(o) {
-      t = o;
+    onKeyPressed(n) {
+      s = n;
     },
-    onKeyReleased(o) {
-      i = o;
+    onKeyReleased(n) {
+      i = n;
     }
   }), {
     activate() {
       e();
     },
     deactivate() {
-      s();
+      t();
     },
-    press(o) {
-      t({ composedPath: () => [], ...o });
+    press(n) {
+      s({ composedPath: () => [], ...n });
     },
-    release(o) {
-      i({ composedPath: () => [], ...o });
+    release(n) {
+      i({ composedPath: () => [], ...n });
     }
   });
 };
 export {
   g as HandlerState,
   u as KeyComboState,
-  v as Keystrokes,
-  N as bindKey,
-  G as bindKeyCombo,
-  W as browserOnActiveBinder,
-  O as browserOnInactiveBinder,
-  z as browserOnKeyPressedBinder,
-  T as browserOnKeyReleasedBinder,
-  J as checkKey,
-  Q as checkKeyCombo,
-  Z as createTestKeystrokes,
-  U as defaultSequenceTimeout,
-  p as getGlobalKeystrokes,
-  V as normalizeKeyCombo,
-  Y as parseKeyCombo,
-  F as setGlobalKeystrokes,
-  j as setGlobalKeystrokesOptions,
-  X as stringifyKeyCombo,
-  D as unbindKey,
-  $ as unbindKeyCombo
+  S as Keystrokes,
+  G as bindKey,
+  J as bindKeyCombo,
+  z as browserOnActiveBinder,
+  U as browserOnInactiveBinder,
+  F as browserOnKeyPressedBinder,
+  H as browserOnKeyReleasedBinder,
+  V as checkKey,
+  X as checkKeyCombo,
+  se as createTestKeystrokes,
+  T as defaultSequenceTimeout,
+  K as getGlobalKeystrokes,
+  Z as normalizeKeyCombo,
+  te as parseKeyCombo,
+  Y as releaseAllKeys,
+  j as setGlobalKeystrokes,
+  N as setGlobalKeystrokesOptions,
+  ee as stringifyKeyCombo,
+  $ as unbindKey,
+  Q as unbindKeyCombo
 };

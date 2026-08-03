@@ -16,6 +16,7 @@ export declare const bindKeyCombo: typeof globalKeystrokes.bindKeyCombo;
 export declare const unbindKeyCombo: typeof globalKeystrokes.unbindKeyCombo;
 export declare const checkKey: typeof globalKeystrokes.checkKey;
 export declare const checkKeyCombo: typeof globalKeystrokes.checkKeyCombo;
+export declare const releaseAllKeys: typeof globalKeystrokes.releaseAllKeys;
 export declare const normalizeKeyCombo: typeof KeyComboState.normalizeKeyCombo;
 export declare const stringifyKeyCombo: typeof KeyComboState.stringifyKeyCombo;
 export declare const parseKeyCombo: typeof KeyComboState.parseKeyCombo;

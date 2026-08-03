@@ -8,6 +8,7 @@ export type KeyComboEventMapper<OriginalEvent, KeyEventProps, KeyComboEventProps
 export type KeyPress<OriginalEvent, KeyEventProps> = {
     key: string;
     aliases: Set<string>;
+    identity?: string;
     event: KeyEvent<OriginalEvent, KeyEventProps>;
 };
 export type KeystrokesOptions<OriginalEvent = KeyboardEvent, KeyEventProps = MaybeBrowserKeyEventProps<OriginalEvent>, KeyComboEventProps = MaybeBrowserKeyComboEventProps<OriginalEvent>> = BindEnvironmentOptions<OriginalEvent, KeyEventProps, KeyComboEventProps>;
@@ -49,9 +50,22 @@ export declare class Keystrokes<OriginalEvent = KeyboardEvent, KeyEventProps = M
     checkKeyComboSequenceIndex(keyCombo: string): number;
     bindEnvironment(options?: BindEnvironmentOptions<OriginalEvent, KeyEventProps, KeyComboEventProps>): void;
     unbindEnvironment(): void;
+    /**
+     * Releases every key currently believed to be held and abandons any progress
+     * through a key combo. Call this whenever keyups may have been missed — the
+     * page regaining focus, or a modal that stopped propagation of key events.
+     *
+     * Without a way to do this a single missed keyup is unrecoverable: a stranded
+     * key stops all single key combos from matching, and a combo left marked as
+     * pressed keeps suppressing shorter combos (see the readme).
+     */
+    releaseAllKeys(): void;
     private _ensureCachedKeyComboState;
+    private _normalizeEvent;
+    private _identityOf;
     private _handleKeyPress;
     private _handleKeyRelease;
+    private _identityOfKeyPress;
     private _updateKeyComboStates;
     private _tryReleaseSelfReleasingKeys;
 }

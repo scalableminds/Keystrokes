@@ -20,11 +20,23 @@ export declare class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventPr
     private _keyComboEventMapper;
     private _movingToNextSequenceAt;
     private _sequenceIndex;
+    private _sequenceAdvancedAt;
     private _unitIndex;
     private _lastActiveKeyPresses;
     private _lastActiveKeyCount;
     private _isPressedWithFinalUnit;
     constructor(keyCombo: string, keyComboEventMapper: KeyComboEventMapper<OriginalEvent, KeyEventProps, KeyComboEventProps>, handler?: Handler<KeyComboEvent<OriginalEvent, KeyEventProps, KeyComboEventProps>>);
+    /**
+     * Releases the combo if it is pressed and abandons any progress through its
+     * sequence.
+     *
+     * Both halves matter. A combo waiting part way through its sequence — "control
+     * + k" typed but not yet completed — is armed without being pressed, so nothing
+     * in the normal release path touches it, and it would otherwise swallow whatever
+     * key is pressed next, however much later.
+     */
+    forceRelease(event?: KeyEvent<OriginalEvent, KeyEventProps>): void;
+    private _resetProgress;
     isOwnHandler(handler: Handler<KeyComboEvent<OriginalEvent, KeyEventProps, KeyComboEventProps>>): boolean;
     executePressed(event: KeyEvent<OriginalEvent, KeyEventProps>): void;
     executeReleased(event: KeyEvent<OriginalEvent, KeyEventProps>): void;
