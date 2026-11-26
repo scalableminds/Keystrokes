@@ -150,6 +150,7 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
   private _lastActiveKeyPresses: KeyPress<OriginalEvent, KeyEventProps>[][]
   private _lastActiveKeyCount: number
   private _isPressedWithFinalUnit: Set<string> | null
+  private _matchedKeyPresses: Set<KeyPress<OriginalEvent, KeyEventProps>>
 
   constructor(
     keyCombo: string,
@@ -173,6 +174,7 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     this._lastActiveKeyPresses = []
     this._lastActiveKeyCount = 0
     this._isPressedWithFinalUnit = null
+    this._matchedKeyPresses = new Set()
   }
 
   /**
@@ -210,6 +212,29 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     this._sequenceAdvancedAt = 0
     this._unitIndex = 0
     this._lastActiveKeyPresses.length = 0
+  }
+
+  /**
+   * Whether the given held key is part of what this combo currently matches:
+   * the combo is pressed, or it completed a sequence and waits for the next one.
+   */
+  claims(keyPress: KeyPress<OriginalEvent, KeyEventProps>) {
+    return (
+      (this.isPressed || this._movingToNextSequenceAt !== 0) &&
+      this._matchedKeyPresses.has(keyPress)
+    )
+  }
+
+  /** Whether this combo matches all held keys the other one does, and more. */
+  isMoreSpecificThan(
+    other: KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps>,
+  ) {
+    if (this._matchedKeyPresses.size <= other._matchedKeyPresses.size)
+      return false
+    for (const keyPress of other._matchedKeyPresses) {
+      if (!this._matchedKeyPresses.has(keyPress)) return false
+    }
+    return true
   }
 
   isOwnHandler(
@@ -285,8 +310,6 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
     const previousUnits = sequence.slice(0, this._unitIndex)
     const remainingUnits = sequence.slice(this._unitIndex)
 
-    let activeKeyIndex = 0
-
     // if we do not have new keys pressed, and we are not advancing to the next
     // sequence, then we reset. If we are advancing to the next sequence but
     // the timeout has passed then we reset. If no keys are pressed then we
@@ -302,36 +325,38 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
       return
     }
 
-    // NOTE[held-key-blocks-single-key-combos]: matching below is positional — each
-    // unit is only searched in the window starting at activeKeyIndex. Consequence:
-    // while any unrelated key is held, no single key combo matches at all. This is
-    // intended for now (`b` must not fire while space is held). If it is ever
-    // deemed unwanted, this is the place to change: scan the whole activeKeyPresses
-    // list and track which entries have already been consumed.
-
-    // go through each each previous unit. If any are no longer pressed then
-    // we reset to the beginning of the combo.
-    for (const previousUnit of previousUnits) {
-      for (const key of previousUnit) {
-        let keyFound = false
-        for (
-          let i = activeKeyIndex;
-          i < activeKeyPresses.length &&
-          i < activeKeyIndex + previousUnit.length;
-          i += 1
-        ) {
+    // Matching ignores held keys that are not part of the combo, so independent
+    // combos can be held at the same time (`d` together with `arrowleft`). Units
+    // still have to be pressed in order: a unit is only searched for behind the
+    // last key of the unit before it. Which combo wins when several match the
+    // same keypress is decided in Keystrokes#_handleKeyPress.
+    const matchedKeyPresses = new Set<KeyPress<OriginalEvent, KeyEventProps>>()
+    let searchFrom = 0
+    const matchUnit = (unit: string[]) => {
+      const foundIndices: number[] = []
+      for (const key of unit) {
+        let keyIndex = -1
+        for (let i = searchFrom; i < activeKeyPresses.length; i += 1) {
           if (
             activeKeyPresses[i].key === key ||
             activeKeyPresses[i].aliases.has(key)
           ) {
-            keyFound = true
+            keyIndex = i
             break
           }
         }
-
-        if (!keyFound) return reset()
+        if (keyIndex === -1) return false
+        foundIndices.push(keyIndex)
       }
-      activeKeyIndex += previousUnit.length
+      for (const i of foundIndices) matchedKeyPresses.add(activeKeyPresses[i])
+      searchFrom = Math.max(...foundIndices) + 1
+      return true
+    }
+
+    // go through each each previous unit. If any are no longer pressed then
+    // we reset to the beginning of the combo.
+    for (const previousUnit of previousUnits) {
+      if (!matchUnit(previousUnit)) return reset()
     }
 
     // If we are already marked to move to the next sequence then we will stop
@@ -341,35 +366,14 @@ export class KeyComboState<OriginalEvent, KeyEventProps, KeyComboEventProps> {
 
     // loop through the remaining units. For each unit that is pressed, advance
     // the unit counter. If all units are pressed then advance the sequence.
+    // If a unit is incomplete do nothing, the user could still press the
+    // remaining keys.
     for (const unit of remainingUnits) {
-      for (const key of unit) {
-        let keyFound = false
-        for (
-          let i = activeKeyIndex;
-          i < activeKeyPresses.length && i < activeKeyIndex + unit.length;
-          i += 1
-        ) {
-          if (
-            activeKeyPresses[i].key === key ||
-            activeKeyPresses[i].aliases.has(key)
-          ) {
-            keyFound = true
-            break
-          }
-        }
-
-        // if the unit is incomplete do nothing, the user could still press
-        // the remaining keys.
-        if (!keyFound) return
-      }
+      if (!matchUnit(unit)) return
       this._unitIndex += 1
-      activeKeyIndex += unit.length
     }
 
-    // Now that we have completed the sequence we need to check for overshoot.
-    // If there are any keys pressed that are not in the current sequence then
-    // we reset.
-    if (activeKeyIndex < activeKeysCount - 1) return reset()
+    this._matchedKeyPresses = matchedKeyPresses
 
     // store the active key presses for the sequence so they can be used in
     // the event.

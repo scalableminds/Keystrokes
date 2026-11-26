@@ -417,9 +417,14 @@ export class Keystrokes<
 
     this._updateKeyComboStates()
 
-    const pressedCombos = this._keyComboStatesArray.filter(
-      (combo) => combo.isPressed,
+    // Only combos this keypress takes part in compete with each other. Combos
+    // on unrelated keys neither fire again nor suppress anything, which is what
+    // lets independent combos be held together.
+    const keyPress = this._activeKeyMap.get(identity)!
+    const claimingCombos = this._keyComboStatesArray.filter((combo) =>
+      combo.claims(keyPress),
     )
+    const pressedCombos = claimingCombos.filter((combo) => combo.isPressed)
 
     if (pressedCombos.length > 0) {
       const maxSequenceLength = Math.max(
@@ -432,10 +437,14 @@ export class Keystrokes<
         KeyComboEventProps
       >[] = []
       for (const combo of pressedCombos) {
-        if (combo.sequenceLength === maxSequenceLength) {
-          combo.executePressed(event)
-          activatedCombos.push(combo)
-        }
+        // The most specific match wins: the longest sequence (`control + k, b`
+        // over `b`), and among those the combo matching the most held keys
+        // (`shift + f` over `f`).
+        if (combo.sequenceLength !== maxSequenceLength) continue
+        if (claimingCombos.some((other) => other.isMoreSpecificThan(combo)))
+          continue
+        combo.executePressed(event)
+        activatedCombos.push(combo)
       }
 
       if (activatedCombos.length > 0) {

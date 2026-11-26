@@ -824,19 +824,137 @@ describe('/stale key state/', () => {
       keystrokes.press(ev('b', 'KeyB'))
       expect(plainPressed).toBeCalledTimes(1)
     })
+  })
 
-    // Documents current behaviour rather than a requirement: matching is
-    // positional, so an unrelated held key blocks single key combos. Intended for
-    // now — see NOTE[held-key-blocks-single-key-combos] in key-combo-state.ts.
-    it('does not fire a single key combo while an unrelated key is held', () => {
+  // scalableminds/webknossos#10456
+  describe('combos held at the same time', () => {
+    const codes: Record<string, string> = {
+      d: 'KeyD',
+      f: 'KeyF',
+      b: 'KeyB',
+      k: 'KeyK',
+      arrowleft: 'ArrowLeft',
+      arrowup: 'ArrowUp',
+      shift: 'ShiftLeft',
+      alt: 'AltLeft',
+      control: 'ControlLeft',
+    }
+
+    // Binds a set of combos that overlap the way real shortcuts do, and returns
+    // a function that plays a list of steps (`+key` presses, `-key` releases)
+    // and reports the handlers that fired, in order.
+    const bindShortcuts = () => {
       const keystrokes = createTestKeystrokes()
-      const bPressed = vi.fn()
-      keystrokes.bindKeyCombo('b', { onPressed: bPressed })
+      const fired: string[] = []
+      const combos = [
+        'd',
+        'f',
+        'b',
+        'k',
+        'arrowleft',
+        'arrowup',
+        'shift + f',
+        'shift + arrowleft',
+        'alt + arrowleft',
+        'control + k, b',
+      ]
+      for (const combo of combos) {
+        keystrokes.bindKeyCombo(combo, {
+          onPressed: () => fired.push(`+${combo}`),
+          onReleased: () => fired.push(`-${combo}`),
+        })
+      }
+      return (...steps: string[]) => {
+        for (const step of steps) {
+          const key = step.slice(1)
+          if (step[0] === '+') keystrokes.press(ev(key, codes[key]))
+          else keystrokes.release(ev(key, codes[key]))
+        }
+        return fired
+      }
+    }
 
-      keystrokes.press(ev(' ', 'Space'))
-      keystrokes.press(ev('b', 'KeyB'))
+    it('fires a single key combo while an unrelated key is held', () => {
+      const play = bindShortcuts()
 
-      expect(bPressed).toBeCalledTimes(0)
+      expect(play('+d', '+arrowleft', '-arrowleft', '-d')).toEqual([
+        '+d',
+        '+arrowleft',
+        '-arrowleft',
+        '-d',
+      ])
+    })
+
+    it('keeps the later combo pressed when the earlier key is released first', () => {
+      const play = bindShortcuts()
+
+      expect(play('+arrowleft', '+d', '-arrowleft', '-d')).toEqual([
+        '+arrowleft',
+        '+d',
+        '-arrowleft',
+        '-d',
+      ])
+    })
+
+    it('does not press a held combo again when other keys come and go', () => {
+      const play = bindShortcuts()
+
+      // Repeated presses are what the browser sends while a key is held.
+      expect(
+        play('+d', '+d', '+arrowleft', '+arrowleft', '-arrowleft', '+d', '-d'),
+      ).toEqual(['+d', '+arrowleft', '-arrowleft', '-d'])
+    })
+
+    it('fires three independent combos held together', () => {
+      const play = bindShortcuts()
+
+      expect(play('+d', '+arrowleft', '+arrowup')).toEqual([
+        '+d',
+        '+arrowleft',
+        '+arrowup',
+      ])
+    })
+
+    it('no longer lets a stranded key block unrelated combos', () => {
+      const play = bindShortcuts()
+
+      // The keyup for `d` is swallowed by the browser.
+      expect(play('+d', '+b', '-b', '+arrowleft', '-arrowleft')).toEqual([
+        '+d',
+        '+b',
+        '-b',
+        '+arrowleft',
+        '-arrowleft',
+      ])
+    })
+
+    it('prefers the combo matching more of the held keys', () => {
+      expect(bindShortcuts()('+shift', '+f', '-f', '-shift')).toEqual([
+        '+shift + f',
+        '-shift + f',
+      ])
+      expect(bindShortcuts()('+alt', '+arrowleft', '-arrowleft')).toEqual([
+        '+alt + arrowleft',
+        '-alt + arrowleft',
+      ])
+    })
+
+    it('prefers the more specific combo next to an unrelated held key', () => {
+      const play = bindShortcuts()
+
+      expect(
+        play('+d', '+shift', '+arrowleft', '-arrowleft', '-shift', '-d'),
+      ).toEqual(['+d', '+shift + arrowleft', '-shift + arrowleft', '-d'])
+    })
+
+    it('does not fire a single key combo for a key that advances a longer combo', () => {
+      const play = bindShortcuts()
+
+      // `k` completes the first sequence of `control + k, b`.
+      expect(play('+control', '+k', '-k', '-control', '+b', '-b')).toEqual([
+        '+control + k, b',
+        '-control + k, b',
+      ])
     })
   })
 

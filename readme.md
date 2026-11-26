@@ -521,21 +521,29 @@ on a punctuation key survive a keyboard-layout change. Related upstream requests
 [#33](https://github.com/RobertWHurst/Keystrokes/issues/33),
 [#58](https://github.com/RobertWHurst/Keystrokes/issues/58). *Upstreamable.*
 
-### 2. Longest combo wins
+### 2. The most specific combo wins
 
 When a keypress completes several combos at once, `_handleKeyPress` executes only
-those whose `sequenceLength` is the largest among them, and `_handleKeyRelease`
-releases them via `_keyCombosPressedByKey`.
+the most specific ones, and `_handleKeyRelease` releases them via
+`_keyCombosPressedByKey`. Two rules apply, in this order:
+
+1. The largest `sequenceLength` wins: `control + k, b` beats `b`.
+2. Among those, a combo loses to one that matches all of its held keys and more:
+   `shift + f` beats `f`. A combo that just completed a non-final sequence counts
+   here too, so typing `control + k` does not fire `k`.
+
+Only the combos the pressed key takes part in compete (`KeyComboState#claims`).
+Combos on other held keys are left alone, see 7.
 
 The motivation is that shortcuts are frequently sub-combos of one another: in
 WEBKNOSSOS `b` sets a branch point while `control + k, b` switches to the brush
 tool. Without this, completing the longer combo also fires the shorter one. Only
-the most specific match should win. *Offered upstream as a PR.*
+the most specific match should win. *The first rule was offered upstream as a PR.*
 
-Invariant to preserve: **a longer combo suppresses shorter ones for exactly as
-long as it is physically held, and not one event longer.** Because suppression is
-global, a combo that stays marked as pressed disables every shorter combo for the
-rest of the session — which is what made this a source of hard-to-diagnose bugs.
+Invariant to preserve: **a more specific combo suppresses the others for exactly
+as long as it is physically held, and not one event longer.** A combo that stays
+marked as pressed keeps suppressing the less specific combos on its keys for the
+rest of the session, which is what made this a source of hard-to-diagnose bugs.
 The recovery path for that is `releaseAllKeys()`, via `forceRelease` in
 `key-combo-state.ts`.
 
@@ -547,8 +555,8 @@ for `_activeKeyPresses`, `_activeKeyMap` and `_keyCombosPressedByKey`.
 `event.key` cannot serve that purpose because the label depends on the modifiers
 held at the time: pressing shift+slash reports `?` on keydown and, if shift is
 released first, `/` on keyup. Tracking by label therefore strands the `?` entry
-forever — and since combo matching is positional, one stranded key stops *every*
-single-key combo from matching until the page reloads.
+forever. With upstream's positional matching (see 7) one stranded key then stops
+*every* single-key combo from matching until the page reloads.
 
 Also covers [#64](https://github.com/RobertWHurst/Keystrokes/issues/64)
 (`Cannot read properties of undefined (reading 'toLowerCase')`): a keydown with
@@ -586,13 +594,27 @@ propagation of key events. Related: [#49](https://github.com/RobertWHurst/Keystr
   [#50](https://github.com/RobertWHurst/Keystrokes/issues/50) and
   [#55](https://github.com/RobertWHurst/Keystrokes/issues/55). *Upstreamable.*
 
-### Known behaviour, deliberately unchanged
+### 7. Unrelated held keys do not block a combo
 
-Combo matching is positional: each unit is only searched in a window starting at
-the current offset into the held-key list. As a result, **while any unrelated key
-is held, no single-key combo matches at all** — holding space and tapping `b`
-does nothing. This is intended for WEBKNOSSOS. If it ever needs revisiting, see
-`NOTE[held-key-blocks-single-key-combos]` in `key-combo-state.ts`.
+Upstream matches combos positionally: each unit is only searched in a window
+starting at the current offset into the held-key list. As a result, while any
+unrelated key is held, no single-key combo matches at all. This fork scans the
+whole held-key list and ignores keys that are not part of the combo. Units still
+have to be pressed in order (`a > b`). See `updateState` in `key-combo-state.ts`.
+
+The motivation is holding independent shortcuts together: in WEBKNOSSOS `d` and
+`f` move through the slices while the arrow keys move within the plane, and
+holding both moves diagonally
+([scalableminds/webknossos#10456](https://github.com/scalableminds/webknossos/issues/10456)).
+It also means a stranded key no longer disables unrelated shortcuts.
+
+Two consequences to be aware of:
+
+- A key that is bound on its own fires while any other key is held, including a
+  modifier it has no combo with. A consumer that wants `f` to stay quiet while
+  alt is down has to check the event itself.
+- A multi-sequence combo only advances once all keys are released, so
+  `control + k, b` does not complete while an unrelated key stays held.
 
 ## Releasing this fork
 
